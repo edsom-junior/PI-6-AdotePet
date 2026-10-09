@@ -1,324 +1,199 @@
 
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-  StatusBar,
-  Alert,
+  View, Text, TextInput, TouchableOpacity,
+  StyleSheet, ScrollView, Alert, ActivityIndicator
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import {
-  COLORS,
-  FONTS,
-  SPACING,
-  RADIUS,
-  globalStyles,
-} from '../styles/theme';
+import { COLORS, RADIUS, globalStyles } from '../styles/theme';
+import { fazerLogin } from '../services/api';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [mostrarSenha, setMostrarSenha] = useState(false);
+  const [carregando, setCarregando] = useState(false);
 
-  function entrar() {
+  async function entrar() {
     if (!email.trim() || !senha) {
-      Alert.alert(
-        'Atenção',
-        'Preencha seu e-mail e sua senha para continuar.'
-      );
+      Alert.alert('Atenção', 'Preencha o e-mail e a senha.');
       return;
     }
 
-    const emailValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
-      email.trim()
-    );
-
-    if (!emailValido) {
-      Alert.alert(
-        'E-mail inválido',
-        'Digite um endereço de e-mail válido.'
-      );
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      Alert.alert('Atenção', 'Digite um e-mail válido.');
       return;
     }
 
-    // Login demonstrativo.
-    // A autenticação real será implementada com o backend.
-    router.replace('/home');
-  }
+    setCarregando(true);
 
-  function recuperarSenha() {
-    Alert.alert(
-      'Recuperar senha',
-      'Essa funcionalidade será implementada quando conectarmos o sistema de autenticação.'
-    );
+    try {
+      await fazerLogin(email.trim(), senha);
+      router.replace('/home');
+    } catch (erro) {
+      Alert.alert(
+        'Erro no login',
+        erro instanceof Error ? erro.message : 'Tente novamente.'
+      );
+    } finally {
+      setCarregando(false);
+    }
   }
 
   return (
-    <View style={globalStyles.container}>
-      <StatusBar
-        barStyle="dark-content"
-        backgroundColor={COLORS.background}
-      />
+    <ScrollView
+      style={globalStyles.container}
+      contentContainerStyle={styles.container}
+      keyboardShouldPersistTaps="handled"
+    >
+      <View style={styles.logo}>
+        <Ionicons name="paw" size={48} color={COLORS.primary} />
+        <Text style={styles.nome}>AdotePet</Text>
+        <Text style={styles.subtitulo}>Amor que transforma vidas</Text>
+      </View>
 
-      <KeyboardAvoidingView
-        style={styles.keyboardContainer}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView
-          contentContainerStyle={styles.container}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          {/* IDENTIDADE DO APLICATIVO */}
-          <View style={styles.brandSection}>
-            <View style={styles.logoContainer}>
-              <Ionicons
-                name="paw"
-                size={48}
-                color={COLORS.primary}
-              />
-            </View>
+      <Text style={styles.titulo}>Bem-vindo de volta!</Text>
+      <Text style={styles.descricao}>
+        Entre na sua conta e encontre um novo amigo
+        para fazer parte da sua família.
+      </Text>
 
-            <Text style={styles.brandName}>
-              AdotePet
-            </Text>
+      <View style={styles.card}>
+        <Text style={styles.cardTitulo}>Acesse sua conta</Text>
 
-            <Text style={styles.brandSubtitle}>
-              Amor que transforma vidas
-            </Text>
-          </View>
+        <Text style={styles.label}>E-mail</Text>
+        <View style={styles.campo}>
+          <Ionicons name="mail-outline" size={21} color={COLORS.textSecondary} />
+          <TextInput
+            style={styles.input}
+            placeholder="Digite seu e-mail"
+            placeholderTextColor={COLORS.placeholder}
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        </View>
 
-          {/* BOAS-VINDAS */}
-          <View style={styles.welcomeSection}>
-            <Text style={styles.title}>
-              Bem-vindo de volta!
-            </Text>
-
-            <Text style={styles.subtitle}>
-              Entre na sua conta e encontre um novo
-              amigo para fazer parte da sua família.
-            </Text>
-          </View>
-
-          {/* FORMULÁRIO */}
-          <View style={styles.formCard}>
-            <Text style={styles.formTitle}>
-              Acesse sua conta
-            </Text>
-
-            {/* E-MAIL */}
-            <Text style={styles.label}>
-              E-mail
-            </Text>
-
-            <View style={styles.inputContainer}>
-              <Ionicons
-                name="mail-outline"
-                size={21}
-                color={COLORS.textSecondary}
-              />
-
-              <TextInput
-                style={styles.input}
-                placeholder="Digite seu e-mail"
-                placeholderTextColor={COLORS.placeholder}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoComplete="email"
-                value={email}
-                onChangeText={setEmail}
-              />
-            </View>
-
-            {/* SENHA */}
-            <Text style={styles.label}>
-              Senha
-            </Text>
-
-            <View style={styles.inputContainer}>
-              <Ionicons
-                name="lock-closed-outline"
-                size={21}
-                color={COLORS.textSecondary}
-              />
-
-              <TextInput
-                style={styles.input}
-                placeholder="Digite sua senha"
-                placeholderTextColor={COLORS.placeholder}
-                secureTextEntry={!mostrarSenha}
-                autoCapitalize="none"
-                value={senha}
-                onChangeText={setSenha}
-              />
-
-              <TouchableOpacity
-                onPress={() => setMostrarSenha(!mostrarSenha)}
-              >
-                <Ionicons
-                  name={
-                    mostrarSenha
-                      ? 'eye-off-outline'
-                      : 'eye-outline'
-                  }
-                  size={22}
-                  color={COLORS.textSecondary}
-                />
-              </TouchableOpacity>
-            </View>
-
-            {/* ESQUECEU A SENHA */}
-            <TouchableOpacity
-              style={styles.forgotPassword}
-              onPress={recuperarSenha}
-            >
-              <Text style={styles.forgotPasswordText}>
-                Esqueceu sua senha?
-              </Text>
-            </TouchableOpacity>
-
-            {/* BOTÃO ENTRAR */}
-            <TouchableOpacity
-              style={styles.loginButton}
-              activeOpacity={0.85}
-              onPress={entrar}
-            >
-              <Text style={styles.loginButtonText}>
-                Entrar
-              </Text>
-
-              <Ionicons
-                name="arrow-forward"
-                size={21}
-                color={COLORS.white}
-              />
-            </TouchableOpacity>
-          </View>
-
-          {/* CADASTRO */}
-          <View style={styles.registerSection}>
-            <Text style={styles.registerText}>
-              Ainda não possui uma conta?
-            </Text>
-
-            <TouchableOpacity
-              onPress={() => router.push('/cadastro')}
-            >
-              <Text style={styles.registerLink}>
-                Criar conta
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* RODAPÉ */}
-          <View style={styles.footer}>
+        <Text style={styles.label}>Senha</Text>
+        <View style={styles.campo}>
+          <Ionicons name="lock-closed-outline" size={21} color={COLORS.textSecondary} />
+          <TextInput
+            style={styles.input}
+            placeholder="Digite sua senha"
+            placeholderTextColor={COLORS.placeholder}
+            value={senha}
+            onChangeText={setSenha}
+            secureTextEntry={!mostrarSenha}
+          />
+          <TouchableOpacity onPress={() => setMostrarSenha(!mostrarSenha)}>
             <Ionicons
-              name="heart-outline"
-              size={17}
-              color={COLORS.primary}
+              name={mostrarSenha ? 'eye-off-outline' : 'eye-outline'}
+              size={22}
+              color={COLORS.textSecondary}
             />
+          </TouchableOpacity>
+        </View>
 
-            <Text style={styles.footerText}>
-              Um lar para cada patinha
-            </Text>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </View>
+        <TouchableOpacity
+          style={styles.esqueci}
+          onPress={() => Alert.alert(
+            'Recuperar senha',
+            'Funcionalidade ainda não disponível.'
+          )}
+        >
+          <Text style={styles.link}>Esqueceu sua senha?</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.botao, carregando && { opacity: 0.6 }]}
+          onPress={entrar}
+          disabled={carregando}
+        >
+          {carregando ? (
+            <ActivityIndicator color={COLORS.white} />
+          ) : (
+            <>
+              <Text style={styles.botaoTexto}>Entrar</Text>
+              <Ionicons name="arrow-forward" size={21} color={COLORS.white} />
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.cadastro}>
+        <Text style={{ color: COLORS.textSecondary }}>
+          Ainda não possui uma conta?
+        </Text>
+        <TouchableOpacity onPress={() => router.push('/cadastro')}>
+          <Text style={styles.link}>Criar conta</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.rodape}>
+        <Ionicons name="heart-outline" size={17} color={COLORS.primary} />
+        <Text style={{ color: COLORS.textSecondary }}>
+          Um lar para cada patinha
+        </Text>
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  keyboardContainer: {
-    flex: 1,
-  },
-
   container: {
     flexGrow: 1,
-    paddingHorizontal: SPACING.lg,
+    paddingHorizontal: 24,
     paddingTop: 65,
     paddingBottom: 35,
-    justifyContent: 'center',
+    justifyContent: 'center'
   },
-
-  brandSection: {
+  logo: {
     alignItems: 'center',
-    marginBottom: 38,
+    marginBottom: 38
   },
-
-  logoContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 30,
-    backgroundColor: COLORS.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-    borderWidth: 3,
-    borderColor: COLORS.white,
-  },
-
-  brandName: {
+  nome: {
     fontSize: 35,
     fontWeight: 'bold',
     color: COLORS.primary,
-    marginBottom: 7,
+    marginTop: 15
   },
-
-  brandSubtitle: {
-    fontSize: 13,
+  subtitulo: {
     color: COLORS.textSecondary,
-    letterSpacing: 0.5,
+    marginTop: 7
   },
-
-  welcomeSection: {
-    marginBottom: 25,
-  },
-
-  title: {
+  titulo: {
     fontSize: 27,
     fontWeight: 'bold',
     color: COLORS.text,
-    marginBottom: 10,
+    marginBottom: 10
   },
-
-  subtitle: {
-    fontSize: FONTS.regular,
+  descricao: {
     color: COLORS.textSecondary,
     lineHeight: 22,
+    marginBottom: 25
   },
-
-  formCard: {
+  card: {
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.extraLarge,
     borderWidth: 1,
     borderColor: COLORS.border,
-    padding: 22,
+    padding: 22
   },
-
-  formTitle: {
+  cardTitulo: {
     fontSize: 19,
     fontWeight: 'bold',
     color: COLORS.text,
-    marginBottom: 24,
+    marginBottom: 24
   },
-
   label: {
-    fontSize: 14,
     fontWeight: 'bold',
     color: COLORS.text,
-    marginBottom: 10,
+    marginBottom: 10
   },
-
-  inputContainer: {
+  campo: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.background,
@@ -327,75 +202,47 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.medium,
     height: 55,
     paddingHorizontal: 14,
-    marginBottom: 21,
+    marginBottom: 21
   },
-
   input: {
     flex: 1,
-    minWidth: 0,
-    fontSize: 14,
     color: COLORS.text,
-    marginLeft: 11,
+    marginLeft: 11
   },
-
-  forgotPassword: {
+  esqueci: {
     alignSelf: 'flex-end',
-    marginBottom: 26,
-    marginTop: -4,
+    marginBottom: 26
   },
-
-  forgotPasswordText: {
-    fontSize: 13,
-    fontWeight: 'bold',
+  link: {
     color: COLORS.primary,
+    fontWeight: 'bold'
   },
-
-  loginButton: {
+  botao: {
     backgroundColor: COLORS.primary,
     borderRadius: RADIUS.medium,
     paddingVertical: 18,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
+    gap: 12
   },
-
-  loginButtonText: {
+  botaoTexto: {
     color: COLORS.white,
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: 'bold'
   },
-
-  registerSection: {
+  cadastro: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'center',
     flexWrap: 'wrap',
     gap: 6,
-    marginTop: 28,
+    marginTop: 28
   },
-
-  registerText: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-  },
-
-  registerLink: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: COLORS.primary,
-  },
-
-  footer: {
+  rodape: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
     gap: 8,
-    marginTop: 42,
-  },
-
-  footerText: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-  },
+    marginTop: 42
+  }
 });

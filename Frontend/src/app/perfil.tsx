@@ -1,412 +1,246 @@
 
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
-  StatusBar,
+  View, Text, StyleSheet, ScrollView,
+  TouchableOpacity, Alert, ActivityIndicator
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import {
-  COLORS,
-  FONTS,
-  SPACING,
-  RADIUS,
-  globalStyles,
-} from '../styles/theme';
+import { COLORS, RADIUS, SPACING, globalStyles } from '../styles/theme';
+import { obterUsuario, sairDaConta, Usuario } from '../services/api';
+
+type Icone = React.ComponentProps<typeof Ionicons>['name'];
 
 export default function PerfilScreen() {
+  const [usuario, setUsuario] = useState<Usuario | null>(null);
+  const [carregando, setCarregando] = useState(true);
 
-  // Dados demonstrativos do usuário
-  const usuario = {
-    nome: 'Renan',
-    email: 'renan@email.com',
-    telefone: '(54) 99999-9999',
-    cidade: 'Erechim - RS',
-  };
+  useFocusEffect(useCallback(() => {
+    let ativo = true;
 
-  function editarPerfil() {
+    async function carregar() {
+      setCarregando(true);
+
+      try {
+        const dados = await obterUsuario();
+        if (ativo) setUsuario(dados);
+      } catch {
+        if (ativo) {
+          Alert.alert('Erro', 'Não foi possível carregar o perfil.');
+        }
+      } finally {
+        if (ativo) setCarregando(false);
+      }
+    }
+
+    carregar();
+    return () => { ativo = false; };
+  }, []));
+
+  function recursoFuturo(titulo: string) {
     Alert.alert(
-      'Editar perfil',
-      'Em breve você poderá alterar seus dados pessoais.'
+      titulo,
+      'Essa funcionalidade estará disponível em uma próxima versão.'
     );
   }
 
-  function meusAnimais() {
-    Alert.alert(
-      'Meus animais cadastrados',
-      'Essa função estará disponível quando conectarmos os cadastros ao banco de dados.'
-    );
-  }
-
-  function minhasAdocoes() {
-    Alert.alert(
-      'Minhas solicitações',
-      'Em breve você poderá acompanhar suas solicitações de adoção.'
-    );
-  }
-
-  function configuracoes() {
-    Alert.alert(
-      'Configurações',
-      'Essa funcionalidade será implementada futuramente.'
-    );
-  }
-
-  function sair() {
+  function confirmarSaida() {
     Alert.alert(
       'Sair da conta',
       'Deseja realmente sair do AdotePet?',
       [
-        {
-          text: 'Cancelar',
-          style: 'cancel',
-        },
+        { text: 'Cancelar', style: 'cancel' },
         {
           text: 'Sair',
           style: 'destructive',
-          onPress: () => router.replace('/'),
-        },
+          onPress: async () => {
+            try {
+              await sairDaConta();
+              router.replace('/');
+            } catch {
+              Alert.alert('Erro', 'Não foi possível sair da conta.');
+            }
+          }
+        }
       ]
+    );
+  }
+
+  function linhaInformacao(icone: Icone, titulo: string, valor: string) {
+    return (
+      <View style={styles.linha}>
+        <View style={styles.icone}>
+          <Ionicons name={icone} size={20} color={COLORS.primary} />
+        </View>
+
+        <View style={{ flex: 1 }}>
+          <Text style={styles.rotulo}>{titulo}</Text>
+          <Text style={styles.valor}>{valor}</Text>
+        </View>
+      </View>
+    );
+  }
+
+  function opcaoMenu(icone: Icone, titulo: string) {
+    return (
+      <TouchableOpacity
+        style={styles.linha}
+        onPress={() => recursoFuturo(titulo)}
+      >
+        <View style={styles.icone}>
+          <Ionicons name={icone} size={21} color={COLORS.primary} />
+        </View>
+
+        <Text style={styles.menuTexto}>{titulo}</Text>
+
+        <Ionicons
+          name="chevron-forward"
+          size={20}
+          color={COLORS.textSecondary}
+        />
+      </TouchableOpacity>
     );
   }
 
   return (
     <View style={globalStyles.container}>
-      <StatusBar
-        barStyle="dark-content"
-        backgroundColor={COLORS.background}
-      />
-
-      {/* CABEÇALHO */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Ionicons
-            name="arrow-back"
-            size={23}
-            color={COLORS.primary}
-          />
+      <View style={styles.cabecalho}>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={25} color={COLORS.primary} />
         </TouchableOpacity>
 
-        <Text style={styles.headerTitle}>
-          Meu perfil
-        </Text>
-
-        <View style={styles.headerSpacer} />
+        <Text style={styles.cabecalhoTitulo}>Meu perfil</Text>
+        <View style={{ width: 25 }} />
       </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.content}
-      >
-
-        {/* PERFIL DO USUÁRIO */}
-        <View style={styles.profileSection}>
-
-          <View style={styles.avatar}>
-            <Ionicons
-              name="person"
-              size={51}
-              color={COLORS.primary}
-            />
-          </View>
-
-          <Text style={styles.name}>
-            {usuario.nome}
-          </Text>
-
-          <View style={styles.memberBadge}>
-            <Ionicons
-              name="paw"
-              size={14}
-              color={COLORS.primary}
-            />
-
-            <Text style={styles.memberText}>
-              Membro AdotePet
-            </Text>
-          </View>
-
-          <Text style={styles.profileDescription}>
-            Juntos podemos transformar a vida
-            de muitos animais.
-          </Text>
-
-        </View>
-
-        {/* DADOS PESSOAIS */}
-        <Text style={styles.sectionTitle}>
-          Informações pessoais
-        </Text>
-
-        <View style={styles.infoBox}>
-
-          <View style={styles.infoRow}>
-            <View style={styles.infoIcon}>
-              <Ionicons
-                name="person-outline"
-                size={20}
-                color={COLORS.primary}
-              />
-            </View>
-
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Nome</Text>
-              <Text style={styles.infoValue}>
-                {usuario.nome}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.divider} />
-
-          <View style={styles.infoRow}>
-            <View style={styles.infoIcon}>
-              <Ionicons
-                name="mail-outline"
-                size={20}
-                color={COLORS.primary}
-              />
-            </View>
-
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>E-mail</Text>
-              <Text style={styles.infoValue}>
-                {usuario.email}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.divider} />
-
-          <View style={styles.infoRow}>
-            <View style={styles.infoIcon}>
-              <Ionicons
-                name="call-outline"
-                size={20}
-                color={COLORS.primary}
-              />
-            </View>
-
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Telefone</Text>
-              <Text style={styles.infoValue}>
-                {usuario.telefone}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.divider} />
-
-          <View style={styles.infoRow}>
-            <View style={styles.infoIcon}>
-              <Ionicons
-                name="location-outline"
-                size={20}
-                color={COLORS.primary}
-              />
-            </View>
-
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Cidade</Text>
-              <Text style={styles.infoValue}>
-                {usuario.cidade}
-              </Text>
-            </View>
-          </View>
-
-        </View>
-
-        {/* GERENCIAMENTO */}
-        <Text style={styles.sectionTitle}>
-          Minha conta
-        </Text>
-
-        <View style={styles.menuBox}>
-
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={editarPerfil}
-          >
-            <View style={styles.menuIcon}>
-              <Ionicons
-                name="create-outline"
-                size={21}
-                color={COLORS.primary}
-              />
-            </View>
-
-            <Text style={styles.menuText}>
-              Editar perfil
-            </Text>
-
-            <Ionicons
-              name="chevron-forward"
-              size={20}
-              color={COLORS.textSecondary}
-            />
-          </TouchableOpacity>
-
-          <View style={styles.menuDivider} />
-
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={meusAnimais}
-          >
-            <View style={styles.menuIcon}>
-              <Ionicons
-                name="paw-outline"
-                size={21}
-                color={COLORS.primary}
-              />
-            </View>
-
-            <Text style={styles.menuText}>
-              Meus animais cadastrados
-            </Text>
-
-            <Ionicons
-              name="chevron-forward"
-              size={20}
-              color={COLORS.textSecondary}
-            />
-          </TouchableOpacity>
-
-          <View style={styles.menuDivider} />
-
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={minhasAdocoes}
-          >
-            <View style={styles.menuIcon}>
-              <Ionicons
-                name="heart-outline"
-                size={21}
-                color={COLORS.primary}
-              />
-            </View>
-
-            <Text style={styles.menuText}>
-              Minhas solicitações
-            </Text>
-
-            <Ionicons
-              name="chevron-forward"
-              size={20}
-              color={COLORS.textSecondary}
-            />
-          </TouchableOpacity>
-
-          <View style={styles.menuDivider} />
-
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={configuracoes}
-          >
-            <View style={styles.menuIcon}>
-              <Ionicons
-                name="settings-outline"
-                size={21}
-                color={COLORS.primary}
-              />
-            </View>
-
-            <Text style={styles.menuText}>
-              Configurações
-            </Text>
-
-            <Ionicons
-              name="chevron-forward"
-              size={20}
-              color={COLORS.textSecondary}
-            />
-          </TouchableOpacity>
-
-        </View>
-
-        {/* SAIR DA CONTA */}
-        <TouchableOpacity
-          style={styles.logoutButton}
-          onPress={sair}
-        >
+      {carregando ? (
+        <ActivityIndicator
+          size="large"
+          color={COLORS.primary}
+          style={{ marginTop: 40 }}
+        />
+      ) : !usuario ? (
+        <View style={styles.semUsuario}>
           <Ionicons
-            name="log-out-outline"
-            size={21}
-            color={COLORS.danger}
-          />
-
-          <Text style={styles.logoutText}>
-            Sair da conta
-          </Text>
-        </TouchableOpacity>
-
-        <View style={styles.footer}>
-          <Ionicons
-            name="paw"
-            size={17}
+            name="person-circle-outline"
+            size={60}
             color={COLORS.primary}
           />
 
-          <Text style={styles.footerText}>
-            AdotePet • Amor que transforma vidas
-          </Text>
-        </View>
+          <Text style={styles.secao}>Você não está conectado.</Text>
 
-      </ScrollView>
+          <TouchableOpacity
+            style={styles.botaoEntrar}
+            onPress={() => router.replace('/')}
+          >
+            <Text style={styles.botaoEntrarTexto}>Fazer login</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.conteudo}>
+          <View style={styles.perfil}>
+            <View style={styles.avatar}>
+              <Ionicons name="person" size={51} color={COLORS.primary} />
+            </View>
+
+            <Text style={styles.nome}>{usuario.name}</Text>
+
+            <View style={styles.etiqueta}>
+              <Ionicons name="paw" size={14} color={COLORS.primary} />
+              <Text style={styles.etiquetaTexto}>
+                {usuario.role === 'SHELTER' ? 'Abrigo AdotePet' : 'Adotante AdotePet'}
+              </Text>
+            </View>
+
+            <Text style={styles.subtitulo}>
+              Juntos podemos transformar a vida de muitos animais.
+            </Text>
+          </View>
+
+          <Text style={styles.secao}>Informações pessoais</Text>
+
+          <View style={styles.caixa}>
+            {linhaInformacao('person-outline', 'Nome', usuario.name)}
+            <View style={styles.divisor} />
+            {linhaInformacao('mail-outline', 'E-mail', usuario.email)}
+            <View style={styles.divisor} />
+            {linhaInformacao(
+              'people-outline',
+              'Tipo de conta',
+              usuario.role === 'SHELTER' ? 'Abrigo' : 'Adotante'
+            )}
+          </View>
+
+          <Text style={styles.secao}>Minha conta</Text>
+
+          <View style={styles.caixa}>
+            {opcaoMenu('create-outline', 'Editar perfil')}
+
+            {usuario.role === 'SHELTER' ? (
+              <>
+                <View style={styles.divisor} />
+                {opcaoMenu('paw-outline', 'Meus animais cadastrados')}
+                <View style={styles.divisor} />
+                {opcaoMenu('heart-outline', 'Solicitações recebidas')}
+              </>
+            ) : (
+              <>
+                <View style={styles.divisor} />
+                {opcaoMenu('heart-outline', 'Minhas solicitações')}
+              </>
+            )}
+
+            <View style={styles.divisor} />
+            {opcaoMenu('settings-outline', 'Configurações')}
+          </View>
+
+          <TouchableOpacity
+            style={styles.sair}
+            onPress={confirmarSaida}
+          >
+            <Ionicons
+              name="log-out-outline"
+              size={21}
+              color={COLORS.danger}
+            />
+            <Text style={styles.sairTexto}>Sair da conta</Text>
+          </TouchableOpacity>
+
+          <View style={styles.rodape}>
+            <Ionicons name="paw" size={17} color={COLORS.primary} />
+            <Text style={styles.rodapeTexto}>
+              AdotePet • Amor que transforma vidas
+            </Text>
+          </View>
+        </ScrollView>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-
-  header: {
+  cabecalho: {
     paddingTop: 55,
     paddingHorizontal: SPACING.lg,
     paddingBottom: 18,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'space-between'
   },
-
-  backButton: {
-    width: 43,
-    height: 43,
-    borderRadius: RADIUS.medium,
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  headerTitle: {
+  cabecalhoTitulo: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: COLORS.text,
+    color: COLORS.text
   },
-
-  headerSpacer: {
-    width: 43,
-  },
-
-  content: {
+  conteudo: {
     paddingHorizontal: SPACING.lg,
     paddingTop: 10,
-    paddingBottom: 45,
+    paddingBottom: 45
   },
-
-  profileSection: {
+  perfil: {
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 32
   },
-
   avatar: {
     width: 110,
     height: 110,
@@ -416,158 +250,121 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 15,
     borderWidth: 4,
-    borderColor: COLORS.white,
+    borderColor: COLORS.white
   },
-
-  name: {
+  nome: {
     fontSize: 27,
     fontWeight: 'bold',
     color: COLORS.text,
-    marginBottom: 10,
+    marginBottom: 10
   },
-
-  memberBadge: {
+  etiqueta: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.primaryLight,
-    borderRadius: 20,
+    gap: 6,
     paddingHorizontal: 13,
     paddingVertical: 7,
-    gap: 6,
+    borderRadius: 20,
+    backgroundColor: COLORS.primaryLight
   },
-
-  memberText: {
+  etiquetaTexto: {
     fontSize: 12,
     fontWeight: 'bold',
-    color: COLORS.primary,
+    color: COLORS.primary
   },
-
-  profileDescription: {
-    fontSize: 13,
+  subtitulo: {
     color: COLORS.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
-    marginTop: 15,
+    marginTop: 15
   },
-
-  sectionTitle: {
-    fontSize: FONTS.large,
+  secao: {
+    fontSize: 19,
     fontWeight: 'bold',
     color: COLORS.text,
-    marginBottom: 15,
+    marginBottom: 15
   },
-
-  infoBox: {
+  caixa: {
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.large,
     borderWidth: 1,
     borderColor: COLORS.border,
-    padding: 18,
-    marginBottom: 28,
+    paddingHorizontal: 18,
+    marginBottom: 28
   },
-
-  infoRow: {
+  linha: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 15
   },
-
-  infoIcon: {
+  icone: {
     width: 42,
     height: 42,
     borderRadius: RADIUS.medium,
     backgroundColor: COLORS.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 13,
+    marginRight: 13
   },
-
-  infoContent: {
-    flex: 1,
-  },
-
-  infoLabel: {
+  rotulo: {
     fontSize: 12,
     color: COLORS.textSecondary,
-    marginBottom: 4,
+    marginBottom: 4
   },
-
-  infoValue: {
+  valor: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: COLORS.text,
+    color: COLORS.text
   },
-
-  divider: {
+  divisor: {
     height: 1,
-    backgroundColor: COLORS.border,
-    marginVertical: 15,
+    backgroundColor: COLORS.border
   },
-
-  menuBox: {
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.large,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    paddingHorizontal: 15,
-    marginBottom: 25,
-  },
-
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 15,
-  },
-
-  menuIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: RADIUS.medium,
-    backgroundColor: COLORS.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 13,
-  },
-
-  menuText: {
+  menuTexto: {
     flex: 1,
-    fontSize: 14,
-    fontWeight: '500',
     color: COLORS.text,
+    fontSize: 14,
+    fontWeight: '500'
   },
-
-  menuDivider: {
-    height: 1,
-    backgroundColor: COLORS.border,
-  },
-
-  logoutButton: {
+  sair: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 16,
     borderWidth: 1,
     borderColor: COLORS.danger,
-    borderRadius: RADIUS.medium,
-    paddingVertical: 16,
-    gap: 10,
+    borderRadius: RADIUS.medium
   },
-
-  logoutText: {
+  sairTexto: {
     fontSize: 15,
     fontWeight: 'bold',
-    color: COLORS.danger,
+    color: COLORS.danger
   },
-
-  footer: {
+  rodape: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 30,
     gap: 7,
+    marginTop: 30
   },
-
-  footerText: {
-    fontSize: 11,
+  rodapeTexto: {
     color: COLORS.textSecondary,
+    fontSize: 11
   },
-
+  semUsuario: {
+    alignItems: 'center',
+    padding: 30,
+    gap: 20
+  },
+  botaoEntrar: {
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.medium,
+    paddingHorizontal: 30,
+    paddingVertical: 15
+  },
+  botaoEntrarTexto: {
+    color: COLORS.white,
+    fontWeight: 'bold'
+  }
 });

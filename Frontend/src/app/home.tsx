@@ -1,399 +1,236 @@
 
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Image,
-  StatusBar,
+  View, Text, TextInput, TouchableOpacity,
+  StyleSheet, ScrollView, Image, Alert,
+  ActivityIndicator, RefreshControl
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import {
-  COLORS,
-  FONTS,
-  SPACING,
-  RADIUS,
-  globalStyles,
-} from '../styles/theme';
-
-type Animal = {
-  id: number;
-  nome: string;
-  tipo: 'Cachorro' | 'Gato';
-  idade: string;
-  sexo: string;
-  cidade: string;
-  foto: string;
-  emoji: string;
-};
-
-const animais: Animal[] = [
-  {
-    id: 1,
-    nome: 'Thor',
-    tipo: 'Cachorro',
-    idade: '2 anos',
-    sexo: 'Macho',
-    cidade: 'Erechim - RS',
-    foto: 'https://images.unsplash.com/photo-1552053831-71594a27632d?w=600',
-    emoji: '🐶',
-  },
-  {
-    id: 2,
-    nome: 'Luna',
-    tipo: 'Gato',
-    idade: '1 ano',
-    sexo: 'Fêmea',
-    cidade: 'Erechim - RS',
-    foto: 'https://images.unsplash.com/photo-1573865526739-10659fec78a5?w=600',
-    emoji: '🐱',
-  },
-  {
-    id: 3,
-    nome: 'Bob',
-    tipo: 'Cachorro',
-    idade: '3 anos',
-    sexo: 'Macho',
-    cidade: 'Erechim - RS',
-    foto: 'https://images.unsplash.com/photo-1587300003388-59208cc962cb?w=600',
-    emoji: '🐕',
-  },
-  {
-    id: 4,
-    nome: 'Mel',
-    tipo: 'Gato',
-    idade: '8 meses',
-    sexo: 'Fêmea',
-    cidade: 'Erechim - RS',
-    foto: 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=600',
-    emoji: '🐈',
-  },
-];
+import { COLORS, RADIUS, SPACING, globalStyles } from '../styles/theme';
+import { listarAnimais, Pet, obterUsuario, Role } from '../services/api';
 
 export default function HomeScreen() {
+  const [animais, setAnimais] = useState<Pet[]>([]);
   const [pesquisa, setPesquisa] = useState('');
   const [categoria, setCategoria] = useState('Todos');
+  const [perfil, setPerfil] = useState<Role | null>(null);
+  const [carregando, setCarregando] = useState(true);
 
-  const animaisFiltrados = animais.filter((animal) => {
-    const busca = pesquisa.trim().toLowerCase();
+  const carregar = useCallback(async () => {
+    setCarregando(true);
+    try {
+      const [lista, usuario] = await Promise.all([
+        listarAnimais(),
+        obterUsuario()
+      ]);
+      setAnimais(lista);
+      setPerfil(usuario?.role ?? null);
+    } catch (erro) {
+      Alert.alert(
+        'Erro',
+        erro instanceof Error ? erro.message : 'Não foi possível carregar os animais.'
+      );
+    } finally {
+      setCarregando(false);
+    }
+  }, []);
 
-    const correspondeBusca =
-      animal.nome.toLowerCase().includes(busca) ||
-      animal.tipo.toLowerCase().includes(busca) ||
-      animal.cidade.toLowerCase().includes(busca);
+  useFocusEffect(useCallback(() => {
+    carregar();
+  }, [carregar]));
 
-    const correspondeCategoria =
-      categoria === 'Todos' || animal.tipo === categoria;
+  const filtrados = animais.filter(animal => {
+    const busca = pesquisa.toLowerCase().trim();
+    const especie = animal.species.toLowerCase();
+    const tipo = especie === 'dog' ? 'cachorro' : especie === 'cat' ? 'gato' : especie;
 
-    return correspondeBusca && correspondeCategoria;
+    return (
+      (animal.name.toLowerCase().includes(busca) ||
+       animal.city.toLowerCase().includes(busca) ||
+       tipo.includes(busca)) &&
+      (categoria === 'Todos' || especie === categoria)
+    );
   });
 
-  function abrirDetalhes(animal: Animal) {
-    router.push({
-      pathname: '/detalhes',
-      params: {
-        nome: animal.nome,
-        tipo: animal.tipo,
-        idade: animal.idade,
-        sexo: animal.sexo,
-        cidade: animal.cidade,
-        foto: animal.foto,
-        emoji: animal.emoji,
-      },
-    });
-  }
+  const abrirDetalhes = (id: string) =>
+    router.push({ pathname: '/detalhes', params: { id } });
 
   return (
     <View style={globalStyles.container}>
-      <StatusBar
-        barStyle="dark-content"
-        backgroundColor={COLORS.background}
-      />
-
       <ScrollView
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl refreshing={carregando} onRefresh={carregar} />
+        }
       >
-        {/* CABEÇALHO */}
         <View style={styles.header}>
-          <View style={styles.headerText}>
-            <Text style={styles.brand}>ADOTEPET</Text>
-
-            <Text style={styles.title}>
-              Encontre seu novo melhor amigo.
-            </Text>
-
-            <Text style={styles.subtitle}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.marca}>ADOTEPET</Text>
+            <Text style={styles.titulo}>Encontre seu novo melhor amigo.</Text>
+            <Text style={styles.subtitulo}>
               Uma nova história pode começar com um encontro.
             </Text>
           </View>
-
-          <TouchableOpacity
-            style={styles.profileButton}
-            onPress={() => router.push('/perfil')}
-          >
-            <Ionicons
-              name="person-outline"
-              size={23}
-              color={COLORS.primary}
-            />
+          <TouchableOpacity onPress={() => router.push('/perfil')}>
+            <Ionicons name="person-circle-outline" size={42} color={COLORS.primary} />
           </TouchableOpacity>
         </View>
 
-        {/* PESQUISA */}
-        <View style={styles.searchBox}>
-          <Ionicons
-            name="search-outline"
-            size={21}
-            color={COLORS.textSecondary}
-          />
-
+        <View style={styles.busca}>
+          <Ionicons name="search-outline" size={21} color={COLORS.textSecondary} />
           <TextInput
-            style={styles.searchInput}
+            style={styles.input}
             placeholder="Buscar por nome, espécie ou cidade"
             placeholderTextColor={COLORS.placeholder}
             value={pesquisa}
             onChangeText={setPesquisa}
           />
-
           {pesquisa.length > 0 && (
             <TouchableOpacity onPress={() => setPesquisa('')}>
-              <Ionicons
-                name="close-circle"
-                size={20}
-                color={COLORS.textSecondary}
-              />
+              <Ionicons name="close-circle" size={20} color={COLORS.textSecondary} />
             </TouchableOpacity>
           )}
         </View>
 
-        {/* BANNER */}
         <View style={styles.banner}>
-          <Text style={styles.bannerLabel}>
-            ADOÇÃO RESPONSÁVEL
-          </Text>
-
-          <Text style={styles.bannerTitle}>
+          <Text style={styles.bannerLabel}>ADOÇÃO RESPONSÁVEL</Text>
+          <Text style={styles.bannerTitulo}>
             Todo animal merece um lar cheio de carinho.
           </Text>
-
-          <Text style={styles.bannerDescription}>
-            Conheça os animais disponíveis e encontre
-            seu novo companheiro.
+          <Text style={styles.subtitulo}>
+            Conheça os animais disponíveis e encontre seu novo companheiro.
           </Text>
-
           <TouchableOpacity
-            style={styles.bannerButton}
+            style={styles.bannerBotao}
             onPress={() => router.push('/animais')}
           >
-            <Text style={styles.bannerButtonText}>
-              Explorar animais
-            </Text>
-
-            <Ionicons
-              name="arrow-forward"
-              size={17}
-              color={COLORS.primary}
-            />
+            <Text style={styles.link}>Explorar animais →</Text>
           </TouchableOpacity>
         </View>
 
-        {/* CATEGORIAS */}
-        <Text style={styles.sectionTitle}>
-          O que você procura?
-        </Text>
-
-        <View style={styles.categories}>
-          {['Todos', 'Cachorro', 'Gato'].map((item) => {
-            const selecionado = categoria === item;
-
-            return (
-              <TouchableOpacity
-                key={item}
-                style={[
-                  styles.categoryButton,
-                  selecionado && styles.categorySelected,
-                ]}
-                onPress={() => setCategoria(item)}
-              >
-                <Ionicons
-                  name={
-                    item === 'Todos'
-                      ? 'apps-outline'
-                      : item === 'Cachorro'
-                      ? 'paw-outline'
-                      : 'heart-outline'
-                  }
-                  size={17}
-                  color={
-                    selecionado
-                      ? COLORS.white
-                      : COLORS.primary
-                  }
-                />
-
-                <Text
-                  style={[
-                    styles.categoryText,
-                    selecionado && styles.categoryTextSelected,
-                  ]}
-                >
-                  {item === 'Cachorro'
-                    ? 'Cães'
-                    : item === 'Gato'
-                    ? 'Gatos'
-                    : 'Todos'}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {/* ANIMAIS */}
-        <View style={styles.sectionHeader}>
-          <View>
-            <Text style={styles.sectionTitle}>
-              À espera de um lar
-            </Text>
-
-            <Text style={styles.sectionSubtitle}>
-              {animaisFiltrados.length} animais encontrados
-            </Text>
-          </View>
-
-          <TouchableOpacity
-            onPress={() => router.push('/animais')}
-          >
-            <Text style={styles.seeAll}>Ver todos</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.animalsGrid}>
-          {animaisFiltrados.map((animal) => (
+        <Text style={styles.secao}>O que você procura?</Text>
+        <View style={styles.categorias}>
+          {[
+            { nome: 'Todos', valor: 'Todos' },
+            { nome: 'Cães', valor: 'dog' },
+            { nome: 'Gatos', valor: 'cat' }
+          ].map(item => (
             <TouchableOpacity
-              key={animal.id}
-              style={styles.animalCard}
-              activeOpacity={0.85}
-              onPress={() => abrirDetalhes(animal)}
+              key={item.valor}
+              style={[
+                styles.categoria,
+                categoria === item.valor && styles.ativo
+              ]}
+              onPress={() => setCategoria(item.valor)}
             >
-              <Image
-                source={{ uri: animal.foto }}
-                style={styles.animalImage}
-                resizeMode="cover"
-              />
-
-              <View style={styles.cardContent}>
-                <Text style={styles.animalName}>
-                  {animal.nome}
-                </Text>
-
-                <Text style={styles.animalDescription}>
-                  {animal.tipo} • {animal.idade}
-                </Text>
-
-                <View style={styles.locationRow}>
-                  <Ionicons
-                    name="location-outline"
-                    size={13}
-                    color={COLORS.textSecondary}
-                  />
-
-                  <Text
-                    style={styles.location}
-                    numberOfLines={1}
-                  >
-                    {animal.cidade}
-                  </Text>
-                </View>
-
-                <View style={styles.cardFooter}>
-                  <Text style={styles.detailsText}>
-                    Conhecer
-                  </Text>
-
-                  <Ionicons
-                    name="arrow-forward-circle"
-                    size={24}
-                    color={COLORS.primary}
-                  />
-                </View>
-              </View>
+              <Text style={{
+                color: categoria === item.valor ? COLORS.white : COLORS.primary,
+                fontWeight: 'bold'
+              }}>
+                {item.nome}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        {animaisFiltrados.length === 0 && (
-          <View style={styles.emptyContainer}>
-            <Ionicons
-              name="search-outline"
-              size={35}
-              color={COLORS.textSecondary}
-            />
-
-            <Text style={styles.emptyTitle}>
-              Nenhum animal encontrado
+        <View style={styles.linha}>
+          <View>
+            <Text style={styles.secao}>À espera de um lar</Text>
+            <Text style={styles.subtitulo}>
+              {filtrados.length} animais encontrados
             </Text>
+          </View>
+          <TouchableOpacity onPress={() => router.push('/animais')}>
+            <Text style={styles.link}>Ver todos</Text>
+          </TouchableOpacity>
+        </View>
 
-            <Text style={styles.emptyDescription}>
-              Tente pesquisar outro nome ou categoria.
-            </Text>
+        {carregando && animais.length === 0 ? (
+          <ActivityIndicator size="large" color={COLORS.primary} />
+        ) : (
+          <View style={styles.grade}>
+            {filtrados.map(animal => (
+              <TouchableOpacity
+                key={animal.id}
+                style={styles.card}
+                onPress={() => abrirDetalhes(animal.id)}
+              >
+                {animal.photoUrl ? (
+                  <Image
+                    source={{ uri: animal.photoUrl }}
+                    style={styles.foto}
+                  />
+                ) : (
+                  <View style={[styles.foto, styles.semFoto]}>
+                    <Ionicons name="paw" size={42} color={COLORS.primary} />
+                  </View>
+                )}
+
+                <View style={styles.cardConteudo}>
+                  <Text style={styles.nome}>{animal.name}</Text>
+                  <Text style={styles.info}>
+                    {animal.species === 'dog' ? 'Cachorro' :
+                     animal.species === 'cat' ? 'Gato' : animal.species}
+                  </Text>
+                  <Text style={styles.info} numberOfLines={1}>
+                    📍 {animal.city}
+                  </Text>
+                  <View style={styles.linha}>
+                    <Text style={styles.link}>Conhecer</Text>
+                    <Ionicons
+                      name="arrow-forward-circle"
+                      size={24}
+                      color={COLORS.primary}
+                    />
+                  </View>
+                </View>
+              </TouchableOpacity>
+            ))}
           </View>
         )}
 
-        <Text style={styles.footerMessage}>
+        {!carregando && filtrados.length === 0 && (
+          <Text style={styles.vazio}>
+            Nenhum animal encontrado.
+          </Text>
+        )}
+
+        <Text style={styles.rodape}>
           Adote com responsabilidade. Transforme uma vida.
         </Text>
       </ScrollView>
 
-      {/* MENU INFERIOR */}
-      <View style={styles.bottomMenu}>
+      <View style={styles.menu}>
         <TouchableOpacity style={styles.menuItem}>
-          <Ionicons
-            name="home"
-            size={23}
-            color={COLORS.primary}
-          />
-          <Text style={styles.menuActive}>Início</Text>
+          <Ionicons name="home" size={24} color={COLORS.primary} />
+          <Text style={styles.link}>Início</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.menuItem}
           onPress={() => router.push('/animais')}
         >
-          <Ionicons
-            name="paw-outline"
-            size={23}
-            color={COLORS.textSecondary}
-          />
-          <Text style={styles.menuText}>Animais</Text>
+          <Ionicons name="paw-outline" size={24} color={COLORS.textSecondary} />
+          <Text style={styles.info}>Animais</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => router.push('/cadastrar-animal')}
-        >
-          <Ionicons
-            name="add"
-            size={28}
-            color={COLORS.white}
-          />
-        </TouchableOpacity>
+        {perfil === 'SHELTER' && (
+          <TouchableOpacity
+            style={styles.adicionar}
+            onPress={() => router.push('/cadastrar-animal')}
+          >
+            <Ionicons name="add" size={28} color={COLORS.white} />
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity
           style={styles.menuItem}
           onPress={() => router.push('/perfil')}
         >
-          <Ionicons
-            name="person-outline"
-            size={23}
-            color={COLORS.textSecondary}
-          />
-          <Text style={styles.menuText}>Perfil</Text>
+          <Ionicons name="person-outline" size={24} color={COLORS.textSecondary} />
+          <Text style={styles.info}>Perfil</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -402,313 +239,177 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   content: {
-    paddingHorizontal: SPACING.lg,
+    padding: SPACING.lg,
     paddingTop: 55,
-    paddingBottom: 120,
+    paddingBottom: 120
   },
-
   header: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
     marginBottom: 25,
+    gap: 10
   },
-
-  headerText: {
-    flex: 1,
-  },
-
-  brand: {
-    fontSize: FONTS.small,
+  marca: {
+    color: COLORS.primary,
     fontWeight: 'bold',
     letterSpacing: 2,
-    color: COLORS.primary,
-    marginBottom: 10,
+    marginBottom: 10
   },
-
-  title: {
-    fontSize: FONTS.title,
+  titulo: {
+    fontSize: 27,
     fontWeight: 'bold',
-    color: COLORS.text,
-    lineHeight: 35,
+    color: COLORS.text
   },
-
-  subtitle: {
-    fontSize: FONTS.regular,
+  subtitulo: {
     color: COLORS.textSecondary,
-    lineHeight: 20,
-    marginTop: 10,
+    lineHeight: 21,
+    marginTop: 8
   },
-
-  profileButton: {
-    width: 46,
-    height: 46,
-    borderRadius: RADIUS.medium,
-    backgroundColor: COLORS.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 10,
-  },
-
-  searchBox: {
+  busca: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.medium,
-    paddingHorizontal: 15,
-    height: 55,
-    marginBottom: 25,
     borderWidth: 1,
     borderColor: COLORS.border,
+    paddingHorizontal: 15,
+    height: 55,
+    marginBottom: 25
   },
-
-  searchInput: {
+  input: {
     flex: 1,
     marginLeft: 10,
-    fontSize: FONTS.regular,
-    color: COLORS.text,
+    color: COLORS.text
   },
-
   banner: {
     backgroundColor: COLORS.primaryLight,
     borderRadius: RADIUS.extraLarge,
     padding: 23,
-    marginBottom: 30,
+    marginBottom: 30
   },
-
   bannerLabel: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    letterSpacing: 1,
     color: COLORS.primary,
-    marginBottom: 12,
-  },
-
-  bannerTitle: {
-    fontSize: 23,
     fontWeight: 'bold',
+    fontSize: 11,
+    marginBottom: 12
+  },
+  bannerTitulo: {
     color: COLORS.primaryDark,
-    lineHeight: 30,
+    fontSize: 23,
+    fontWeight: 'bold'
   },
-
-  bannerDescription: {
-    fontSize: 13,
-    color: COLORS.primary,
-    lineHeight: 20,
-    marginTop: 10,
-  },
-
-  bannerButton: {
+  bannerBotao: {
     backgroundColor: COLORS.white,
-    borderRadius: RADIUS.medium,
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
     alignSelf: 'flex-start',
-    gap: 10,
-    marginTop: 20,
+    padding: 14,
+    borderRadius: RADIUS.medium,
+    marginTop: 20
   },
-
-  bannerButtonText: {
-    color: COLORS.primary,
-    fontSize: 13,
-    fontWeight: 'bold',
-  },
-
-  sectionTitle: {
-    fontSize: FONTS.large,
+  secao: {
+    fontSize: 19,
     fontWeight: 'bold',
     color: COLORS.text,
-    marginBottom: 12,
+    marginBottom: 10
   },
-
-  categories: {
+  categorias: {
     flexDirection: 'row',
     gap: 10,
-    marginBottom: 30,
+    marginBottom: 30
   },
-
-  categoryButton: {
+  categoria: {
     flex: 1,
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 7,
     paddingVertical: 14,
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.medium,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: COLORS.border
   },
-
-  categorySelected: {
+  ativo: {
     backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
+    borderColor: COLORS.primary
   },
-
-  categoryText: {
-    color: COLORS.primary,
-    fontSize: 13,
-    fontWeight: 'bold',
-  },
-
-  categoryTextSelected: {
-    color: COLORS.white,
-  },
-
-  sectionHeader: {
+  linha: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    justifyContent: 'space-between',
+    marginTop: 10
   },
-
-  sectionSubtitle: {
-    fontSize: FONTS.small,
-    color: COLORS.textSecondary,
-    marginTop: -7,
-    marginBottom: 12,
-  },
-
-  seeAll: {
-    fontSize: 13,
-    fontWeight: 'bold',
+  link: {
     color: COLORS.primary,
+    fontWeight: 'bold'
   },
-
-  animalsGrid: {
+  grade: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    justifyContent: 'space-between'
   },
-
-  animalCard: {
+  card: {
     width: '48%',
-    backgroundColor: COLORS.card,
+    backgroundColor: COLORS.white,
     borderRadius: RADIUS.large,
-    overflow: 'hidden',
     borderWidth: 1,
     borderColor: COLORS.border,
-    marginBottom: 15,
+    overflow: 'hidden',
+    marginBottom: 15
   },
-
-  animalImage: {
+  foto: {
     width: '100%',
-    height: 150,
+    height: 150
+  },
+  semFoto: {
     backgroundColor: COLORS.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center'
   },
-
-  cardContent: {
-    padding: 12,
+  cardConteudo: {
+    padding: 12
   },
-
-  animalName: {
+  nome: {
     fontSize: 19,
     fontWeight: 'bold',
-    color: COLORS.text,
+    color: COLORS.text
   },
-
-  animalDescription: {
-    fontSize: FONTS.small,
+  info: {
     color: COLORS.textSecondary,
-    marginTop: 5,
-  },
-
-  locationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    marginTop: 9,
-  },
-
-  location: {
-    flex: 1,
-    fontSize: 11,
-    color: COLORS.textSecondary,
-  },
-
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    paddingTop: 10,
-    marginTop: 13,
-  },
-
-  detailsText: {
     fontSize: 12,
-    fontWeight: 'bold',
-    color: COLORS.primary,
+    marginTop: 5
   },
-
-  emptyContainer: {
-    alignItems: 'center',
-    paddingVertical: 35,
-  },
-
-  emptyTitle: {
-    fontSize: 17,
-    fontWeight: 'bold',
-    color: COLORS.text,
-    marginTop: 12,
-  },
-
-  emptyDescription: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
-    marginTop: 5,
+  vazio: {
     textAlign: 'center',
+    color: COLORS.textSecondary,
+    marginVertical: 30
   },
-
-  footerMessage: {
+  rodape: {
+    textAlign: 'center',
+    color: COLORS.textSecondary,
     fontSize: 11,
-    color: COLORS.textSecondary,
-    textAlign: 'center',
-    marginTop: 25,
+    marginTop: 25
   },
-
-  bottomMenu: {
+  menu: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
     backgroundColor: COLORS.white,
     borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    paddingTop: 14,
-    paddingBottom: 22,
-    paddingHorizontal: 24,
+    borderColor: COLORS.border,
+    paddingVertical: 18,
+    paddingHorizontal: 25,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'space-between'
   },
-
   menuItem: {
     alignItems: 'center',
-    gap: 5,
-    minWidth: 50,
+    gap: 4
   },
-
-  menuActive: {
-    color: COLORS.primary,
-    fontSize: 11,
-    fontWeight: 'bold',
-  },
-
-  menuText: {
-    color: COLORS.textSecondary,
-    fontSize: 11,
-  },
-
-  addButton: {
+  adicionar: {
     width: 52,
     height: 52,
     borderRadius: RADIUS.large,
     backgroundColor: COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: -25,
-  },
+    marginTop: -25
+  }
 });

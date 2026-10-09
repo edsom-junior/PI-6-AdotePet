@@ -1,505 +1,338 @@
 
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Alert,
-  StatusBar,
-  KeyboardAvoidingView,
-  Platform,
+  View, Text, TextInput, TouchableOpacity,
+  StyleSheet, ScrollView, Alert, ActivityIndicator,
+  KeyboardAvoidingView, Platform
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import {
-  COLORS,
-  FONTS,
-  SPACING,
-  RADIUS,
-  globalStyles,
-} from '../styles/theme';
+import { COLORS, RADIUS, SPACING, globalStyles } from '../styles/theme';
+import { cadastrarUsuario, Role } from '../services/api';
 
 export default function CadastroScreen() {
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
-  const [telefone, setTelefone] = useState('');
   const [senha, setSenha] = useState('');
-  const [confirmarSenha, setConfirmarSenha] = useState('');
-
+  const [confirmar, setConfirmar] = useState('');
+  const [perfil, setPerfil] = useState<Role>('ADOPTER');
   const [mostrarSenha, setMostrarSenha] = useState(false);
-  const [mostrarConfirmacao, setMostrarConfirmacao] = useState(false);
+  const [carregando, setCarregando] = useState(false);
 
-  function criarConta() {
-    if (
-      !nome.trim() ||
-      !email.trim() ||
-      !telefone.trim() ||
-      !senha ||
-      !confirmarSenha
-    ) {
+  async function criarConta() {
+    if (!nome.trim() || !email.trim() || !senha || !confirmar) {
+      Alert.alert('Atenção', 'Preencha todos os campos.');
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      Alert.alert('Atenção', 'Digite um e-mail válido.');
+      return;
+    }
+
+    if (senha.length < 6 || senha !== confirmar) {
       Alert.alert(
         'Atenção',
-        'Preencha todos os campos para continuar.'
+        senha.length < 6
+          ? 'A senha deve ter pelo menos 6 caracteres.'
+          : 'As senhas não são iguais.'
       );
       return;
     }
 
-    const emailValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
-      email.trim()
-    );
+    setCarregando(true);
 
-    if (!emailValido) {
+    try {
+      await cadastrarUsuario({
+        name: nome.trim(),
+        email: email.trim().toLowerCase(),
+        password: senha,
+        role: perfil
+      });
+
       Alert.alert(
-        'E-mail inválido',
-        'Digite um endereço de e-mail válido.'
+        'Cadastro realizado!',
+        'Sua conta foi criada. Faça login para continuar.',
+        [{ text: 'Entrar', onPress: () => router.replace('/') }]
       );
-      return;
-    }
-
-    if (telefone.replace(/\D/g, '').length < 10) {
+    } catch (erro) {
       Alert.alert(
-        'Telefone inválido',
-        'Digite um telefone com DDD.'
+        'Erro no cadastro',
+        erro instanceof Error ? erro.message : 'Tente novamente.'
       );
-      return;
+    } finally {
+      setCarregando(false);
     }
-
-    if (senha.length < 6) {
-      Alert.alert(
-        'Senha muito curta',
-        'A senha deve conter pelo menos 6 caracteres.'
-      );
-      return;
-    }
-
-    if (senha !== confirmarSenha) {
-      Alert.alert(
-        'Senhas diferentes',
-        'A senha e a confirmação precisam ser iguais.'
-      );
-      return;
-    }
-
-    Alert.alert(
-      'Cadastro demonstrativo',
-      'Seus dados foram validados! O cadastro real será ativado quando conectarmos o aplicativo ao backend.',
-      [
-        {
-          text: 'Voltar ao login',
-          onPress: () => router.replace('/'),
-        },
-      ]
-    );
   }
 
   return (
-    <View style={globalStyles.container}>
-      <StatusBar
-        barStyle="dark-content"
-        backgroundColor={COLORS.background}
-      />
-
-      <KeyboardAvoidingView
-        style={styles.keyboardContainer}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    <KeyboardAvoidingView
+      style={globalStyles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <ScrollView
-          contentContainerStyle={styles.container}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* VOLTAR */}
+        <TouchableOpacity onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={25} color={COLORS.primary} />
+        </TouchableOpacity>
+
+        <View style={styles.logo}>
+          <Ionicons name="paw" size={45} color={COLORS.primary} />
+          <Text style={styles.marca}>AdotePet</Text>
+        </View>
+
+        <Text style={styles.titulo}>Crie sua conta</Text>
+        <Text style={styles.subtitulo}>
+          Faça parte da nossa comunidade e ajude
+          animais a encontrarem um novo lar.
+        </Text>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitulo}>Seus dados</Text>
+
+          <Text style={styles.label}>Nome completo</Text>
+          <View style={styles.campo}>
+            <Ionicons name="person-outline" size={20} color={COLORS.textSecondary} />
+            <TextInput
+              style={styles.input}
+              placeholder="Digite seu nome"
+              placeholderTextColor={COLORS.placeholder}
+              value={nome}
+              onChangeText={setNome}
+              autoCapitalize="words"
+            />
+          </View>
+
+          <Text style={styles.label}>E-mail</Text>
+          <View style={styles.campo}>
+            <Ionicons name="mail-outline" size={20} color={COLORS.textSecondary} />
+            <TextInput
+              style={styles.input}
+              placeholder="Digite seu e-mail"
+              placeholderTextColor={COLORS.placeholder}
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+
+          <Text style={styles.label}>Senha</Text>
+          <View style={styles.campo}>
+            <Ionicons name="lock-closed-outline" size={20} color={COLORS.textSecondary} />
+            <TextInput
+              style={styles.input}
+              placeholder="Mínimo de 6 caracteres"
+              placeholderTextColor={COLORS.placeholder}
+              value={senha}
+              onChangeText={setSenha}
+              secureTextEntry={!mostrarSenha}
+              autoCapitalize="none"
+            />
+            <TouchableOpacity onPress={() => setMostrarSenha(!mostrarSenha)}>
+              <Ionicons
+                name={mostrarSenha ? 'eye-off-outline' : 'eye-outline'}
+                size={21}
+                color={COLORS.textSecondary}
+              />
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.label}>Confirmar senha</Text>
+          <View style={styles.campo}>
+            <Ionicons name="shield-checkmark-outline" size={20} color={COLORS.textSecondary} />
+            <TextInput
+              style={styles.input}
+              placeholder="Digite a senha novamente"
+              placeholderTextColor={COLORS.placeholder}
+              value={confirmar}
+              onChangeText={setConfirmar}
+              secureTextEntry={!mostrarSenha}
+              autoCapitalize="none"
+            />
+          </View>
+
+          <Text style={styles.label}>Tipo de conta</Text>
+          <View style={styles.opcoes}>
+            {([
+              { valor: 'ADOPTER', texto: 'Adotante', icone: 'heart-outline' },
+              { valor: 'SHELTER', texto: 'Abrigo', icone: 'home-outline' }
+            ] as const).map(opcao => (
+              <TouchableOpacity
+                key={opcao.valor}
+                style={[
+                  styles.opcao,
+                  perfil === opcao.valor && styles.selecionado
+                ]}
+                onPress={() => setPerfil(opcao.valor)}
+              >
+                <Ionicons
+                  name={opcao.icone}
+                  size={20}
+                  color={COLORS.primary}
+                />
+                <Text style={styles.opcaoTexto}>{opcao.texto}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
           <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
+            style={[styles.botao, carregando && { opacity: 0.6 }]}
+            onPress={criarConta}
+            disabled={carregando}
           >
-            <Ionicons
-              name="arrow-back"
-              size={23}
-              color={COLORS.primary}
-            />
+            {carregando ? (
+              <ActivityIndicator color={COLORS.white} />
+            ) : (
+              <>
+                <Text style={styles.botaoTexto}>Criar conta</Text>
+                <Ionicons name="arrow-forward" size={20} color={COLORS.white} />
+              </>
+            )}
           </TouchableOpacity>
+        </View>
 
-          {/* LOGO */}
-          <View style={styles.logoArea}>
-            <View style={styles.logoIcon}>
-              <Ionicons
-                name="paw"
-                size={35}
-                color={COLORS.primary}
-              />
-            </View>
-
-            <Text style={styles.brandName}>
-              AdotePet
-            </Text>
-          </View>
-
-          {/* TÍTULO */}
-          <Text style={styles.title}>
-            Crie sua conta
+        <View style={styles.login}>
+          <Text style={{ color: COLORS.textSecondary }}>
+            Já possui uma conta?
           </Text>
+          <TouchableOpacity onPress={() => router.replace('/')}>
+            <Text style={styles.link}>Entrar</Text>
+          </TouchableOpacity>
+        </View>
 
-          <Text style={styles.subtitle}>
-            Faça parte da nossa comunidade e ajude
-            animais a encontrarem um novo lar.
+        <View style={styles.rodape}>
+          <Ionicons name="heart-outline" size={16} color={COLORS.primary} />
+          <Text style={{ color: COLORS.textSecondary, fontSize: 11 }}>
+            AdotePet • Amor que transforma vidas
           </Text>
-
-          {/* FORMULÁRIO */}
-          <View style={styles.formCard}>
-            <Text style={styles.formTitle}>
-              Seus dados
-            </Text>
-
-            {/* NOME */}
-            <Text style={styles.label}>
-              Nome completo
-            </Text>
-
-            <View style={styles.inputContainer}>
-              <Ionicons
-                name="person-outline"
-                size={20}
-                color={COLORS.textSecondary}
-              />
-
-              <TextInput
-                style={styles.input}
-                placeholder="Digite seu nome"
-                placeholderTextColor={COLORS.placeholder}
-                value={nome}
-                onChangeText={setNome}
-                autoCapitalize="words"
-              />
-            </View>
-
-            {/* EMAIL */}
-            <Text style={styles.label}>
-              E-mail
-            </Text>
-
-            <View style={styles.inputContainer}>
-              <Ionicons
-                name="mail-outline"
-                size={20}
-                color={COLORS.textSecondary}
-              />
-
-              <TextInput
-                style={styles.input}
-                placeholder="Digite seu e-mail"
-                placeholderTextColor={COLORS.placeholder}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-                value={email}
-                onChangeText={setEmail}
-              />
-            </View>
-
-            {/* TELEFONE */}
-            <Text style={styles.label}>
-              Telefone
-            </Text>
-
-            <View style={styles.inputContainer}>
-              <Ionicons
-                name="call-outline"
-                size={20}
-                color={COLORS.textSecondary}
-              />
-
-              <TextInput
-                style={styles.input}
-                placeholder="(54) 99999-9999"
-                placeholderTextColor={COLORS.placeholder}
-                keyboardType="phone-pad"
-                value={telefone}
-                onChangeText={setTelefone}
-              />
-            </View>
-
-            {/* SENHA */}
-            <Text style={styles.label}>
-              Senha
-            </Text>
-
-            <View style={styles.inputContainer}>
-              <Ionicons
-                name="lock-closed-outline"
-                size={20}
-                color={COLORS.textSecondary}
-              />
-
-              <TextInput
-                style={styles.input}
-                placeholder="Mínimo de 6 caracteres"
-                placeholderTextColor={COLORS.placeholder}
-                secureTextEntry={!mostrarSenha}
-                value={senha}
-                onChangeText={setSenha}
-                autoCapitalize="none"
-              />
-
-              <TouchableOpacity
-                onPress={() => setMostrarSenha(!mostrarSenha)}
-              >
-                <Ionicons
-                  name={
-                    mostrarSenha
-                      ? 'eye-off-outline'
-                      : 'eye-outline'
-                  }
-                  size={21}
-                  color={COLORS.textSecondary}
-                />
-              </TouchableOpacity>
-            </View>
-
-            {/* CONFIRMAR SENHA */}
-            <Text style={styles.label}>
-              Confirmar senha
-            </Text>
-
-            <View style={styles.inputContainer}>
-              <Ionicons
-                name="shield-checkmark-outline"
-                size={20}
-                color={COLORS.textSecondary}
-              />
-
-              <TextInput
-                style={styles.input}
-                placeholder="Digite a senha novamente"
-                placeholderTextColor={COLORS.placeholder}
-                secureTextEntry={!mostrarConfirmacao}
-                value={confirmarSenha}
-                onChangeText={setConfirmarSenha}
-                autoCapitalize="none"
-              />
-
-              <TouchableOpacity
-                onPress={() =>
-                  setMostrarConfirmacao(!mostrarConfirmacao)
-                }
-              >
-                <Ionicons
-                  name={
-                    mostrarConfirmacao
-                      ? 'eye-off-outline'
-                      : 'eye-outline'
-                  }
-                  size={21}
-                  color={COLORS.textSecondary}
-                />
-              </TouchableOpacity>
-            </View>
-
-            {/* BOTÃO */}
-            <TouchableOpacity
-              style={styles.button}
-              onPress={criarConta}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.buttonText}>
-                Criar conta
-              </Text>
-
-              <Ionicons
-                name="arrow-forward"
-                size={20}
-                color={COLORS.white}
-              />
-            </TouchableOpacity>
-          </View>
-
-          {/* LOGIN */}
-          <View style={styles.loginArea}>
-            <Text style={styles.loginText}>
-              Já possui uma conta?
-            </Text>
-
-            <TouchableOpacity
-              onPress={() => router.replace('/')}
-            >
-              <Text style={styles.loginButton}>
-                Entrar
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* RODAPÉ */}
-          <View style={styles.footer}>
-            <Ionicons
-              name="heart-outline"
-              size={16}
-              color={COLORS.primary}
-            />
-
-            <Text style={styles.footerText}>
-              AdotePet • Amor que transforma vidas
-            </Text>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </View>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  keyboardContainer: {
-    flex: 1,
-  },
-
   container: {
     flexGrow: 1,
     paddingHorizontal: SPACING.lg,
     paddingTop: 55,
-    paddingBottom: 35,
+    paddingBottom: 35
   },
-
-  backButton: {
-    width: 43,
-    height: 43,
-    borderRadius: RADIUS.medium,
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+  logo: {
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 15,
+    marginVertical: 20
   },
-
-  logoArea: {
-    alignItems: 'center',
-    marginBottom: 25,
-  },
-
-  logoIcon: {
-    width: 75,
-    height: 75,
-    borderRadius: 24,
-    backgroundColor: COLORS.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
-  },
-
-  brandName: {
+  marca: {
     fontSize: 21,
     fontWeight: 'bold',
     color: COLORS.primary,
+    marginTop: 8
   },
-
-  title: {
+  titulo: {
     fontSize: 29,
     fontWeight: 'bold',
     color: COLORS.text,
-    textAlign: 'center',
-    marginBottom: 10,
+    textAlign: 'center'
   },
-
-  subtitle: {
-    fontSize: FONTS.regular,
+  subtitulo: {
     color: COLORS.textSecondary,
     textAlign: 'center',
     lineHeight: 22,
-    marginBottom: 27,
-    paddingHorizontal: 8,
+    marginVertical: 15
   },
-
-  formCard: {
+  card: {
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.extraLarge,
     borderWidth: 1,
     borderColor: COLORS.border,
-    padding: 20,
+    padding: 20
   },
-
-  formTitle: {
+  cardTitulo: {
     fontSize: 19,
     fontWeight: 'bold',
     color: COLORS.text,
-    marginBottom: 22,
+    marginBottom: 22
   },
-
   label: {
-    fontSize: 13,
     fontWeight: 'bold',
     color: COLORS.text,
-    marginBottom: 9,
+    marginBottom: 9
   },
-
-  inputContainer: {
+  campo: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.background,
     borderWidth: 1,
     borderColor: COLORS.border,
     borderRadius: RADIUS.medium,
-    paddingHorizontal: 13,
-    marginBottom: 20,
     height: 54,
+    paddingHorizontal: 13,
+    marginBottom: 20
   },
-
   input: {
     flex: 1,
-    fontSize: 14,
-    color: COLORS.text,
-    marginLeft: 10,
     minWidth: 0,
+    color: COLORS.text,
+    marginLeft: 10
   },
-
-  button: {
+  opcoes: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 22
+  },
+  opcao: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 7,
+    paddingVertical: 15,
+    borderRadius: RADIUS.medium,
+    borderWidth: 1,
+    borderColor: COLORS.border
+  },
+  selecionado: {
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primaryLight
+  },
+  opcaoTexto: {
+    color: COLORS.text,
+    fontWeight: 'bold'
+  },
+  botao: {
     backgroundColor: COLORS.primary,
     borderRadius: RADIUS.medium,
     paddingVertical: 17,
-    paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
-    marginTop: 8,
+    gap: 12
   },
-
-  buttonText: {
+  botaoTexto: {
     color: COLORS.white,
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: 'bold'
   },
-
-  loginArea: {
+  login: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    marginTop: 28,
+    marginTop: 28
   },
-
-  loginText: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-  },
-
-  loginButton: {
-    fontSize: 14,
-    fontWeight: 'bold',
+  link: {
     color: COLORS.primary,
+    fontWeight: 'bold'
   },
-
-  footer: {
+  rodape: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
     gap: 7,
-    marginTop: 32,
-  },
-
-  footerText: {
-    fontSize: 11,
-    color: COLORS.textSecondary,
-  },
+    marginTop: 32
+  }
 });

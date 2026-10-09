@@ -1,288 +1,175 @@
 
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  Image,
-  StatusBar,
+  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  ScrollView, Image, ActivityIndicator, RefreshControl
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import {
-  COLORS,
-  FONTS,
-  SPACING,
-  RADIUS,
-  globalStyles,
-} from '../styles/theme';
-
-type Animal = {
-  id: number;
-  nome: string;
-  tipo: 'Cachorro' | 'Gato';
-  idade: string;
-  sexo: string;
-  cidade: string;
-  emoji: string;
-  foto: string;
-};
-
-const animais: Animal[] = [
-  {
-    id: 1,
-    nome: 'Thor',
-    tipo: 'Cachorro',
-    idade: '2 anos',
-    sexo: 'Macho',
-    cidade: 'Erechim - RS',
-    emoji: '🐶',
-    foto: 'https://images.unsplash.com/photo-1552053831-71594a27632d?w=600',
-  },
-  {
-    id: 2,
-    nome: 'Luna',
-    tipo: 'Gato',
-    idade: '1 ano',
-    sexo: 'Fêmea',
-    cidade: 'Erechim - RS',
-    emoji: '🐱',
-    foto: 'https://images.unsplash.com/photo-1573865526739-10659fec78a5?w=600',
-  },
-  {
-    id: 3,
-    nome: 'Bob',
-    tipo: 'Cachorro',
-    idade: '3 anos',
-    sexo: 'Macho',
-    cidade: 'Erechim - RS',
-    emoji: '🐕',
-    foto: 'https://images.unsplash.com/photo-1587300003388-59208cc962cb?w=600',
-  },
-  {
-    id: 4,
-    nome: 'Mel',
-    tipo: 'Gato',
-    idade: '8 meses',
-    sexo: 'Fêmea',
-    cidade: 'Erechim - RS',
-    emoji: '🐈',
-    foto: 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=600',
-  },
-];
+import { COLORS, RADIUS, SPACING, globalStyles } from '../styles/theme';
+import { listarAnimais, Pet } from '../services/api';
 
 export default function AnimaisScreen() {
+  const [animais, setAnimais] = useState<Pet[]>([]);
   const [pesquisa, setPesquisa] = useState('');
   const [categoria, setCategoria] = useState('Todos');
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState('');
 
-  const animaisFiltrados = animais.filter((animal) => {
+  const carregar = useCallback(async () => {
+    setCarregando(true);
+    setErro('');
+
+    try {
+      setAnimais(await listarAnimais());
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Erro ao carregar animais.');
+    } finally {
+      setCarregando(false);
+    }
+  }, []);
+
+  useFocusEffect(useCallback(() => {
+    carregar();
+  }, [carregar]));
+
+  const filtrados = animais.filter(animal => {
     const termo = pesquisa.trim().toLowerCase();
+    const especie = animal.species.toLowerCase();
+    const tipo = especie === 'dog' ? 'cachorro' :
+                 especie === 'cat' ? 'gato' : especie;
 
-    const correspondePesquisa =
-      animal.nome.toLowerCase().includes(termo) ||
-      animal.tipo.toLowerCase().includes(termo) ||
-      animal.cidade.toLowerCase().includes(termo);
-
-    const correspondeCategoria =
-      categoria === 'Todos' || animal.tipo === categoria;
-
-    return correspondePesquisa && correspondeCategoria;
+    return (
+      (animal.name.toLowerCase().includes(termo) ||
+       animal.city.toLowerCase().includes(termo) ||
+       tipo.includes(termo)) &&
+      (categoria === 'Todos' || especie === categoria)
+    );
   });
-
-  function abrirDetalhes(animal: Animal) {
-    router.push({
-      pathname: '/detalhes',
-      params: {
-        nome: animal.nome,
-        tipo: animal.tipo,
-        idade: animal.idade,
-        sexo: animal.sexo,
-        cidade: animal.cidade,
-        emoji: animal.emoji,
-        foto: animal.foto,
-      },
-    });
-  }
 
   return (
     <View style={globalStyles.container}>
-      <StatusBar
-        barStyle="dark-content"
-        backgroundColor={COLORS.background}
-      />
-
-      {/* CABEÇALHO */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Ionicons
-            name="arrow-back"
-            size={23}
-            color={COLORS.primary}
-          />
+        <TouchableOpacity onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={25} color={COLORS.primary} />
         </TouchableOpacity>
 
-        <View style={styles.headerText}>
-          <Text style={styles.headerLabel}>ADOTEPET</Text>
-          <Text style={styles.title}>Encontre seu amigo</Text>
+        <View style={{ flex: 1, marginLeft: 15 }}>
+          <Text style={styles.marca}>ADOTEPET</Text>
+          <Text style={styles.titulo}>Encontre seu amigo</Text>
         </View>
 
-        <TouchableOpacity
-          style={styles.profileButton}
-          onPress={() => router.push('/perfil')}
-        >
-          <Ionicons
-            name="person-outline"
-            size={22}
-            color={COLORS.primary}
-          />
+        <TouchableOpacity onPress={() => router.push('/perfil')}>
+          <Ionicons name="person-circle-outline" size={35} color={COLORS.primary} />
         </TouchableOpacity>
       </View>
 
       <ScrollView
-        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.conteudo}
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl refreshing={carregando} onRefresh={carregar} />
+        }
       >
-        {/* INTRODUÇÃO */}
-        <Text style={styles.subtitle}>
-          Conheça os animais que estão esperando por
-          uma família e muito carinho.
+        <Text style={styles.subtitulo}>
+          Conheça os animais que estão esperando por uma família e muito carinho.
         </Text>
 
-        {/* PESQUISA */}
-        <View style={styles.searchBox}>
-          <Ionicons
-            name="search-outline"
-            size={21}
-            color={COLORS.textSecondary}
-          />
-
+        <View style={styles.busca}>
+          <Ionicons name="search-outline" size={21} color={COLORS.textSecondary} />
           <TextInput
-            style={styles.searchInput}
+            style={styles.input}
             placeholder="Buscar animal ou cidade..."
             placeholderTextColor={COLORS.placeholder}
             value={pesquisa}
             onChangeText={setPesquisa}
           />
-
           {pesquisa.length > 0 && (
             <TouchableOpacity onPress={() => setPesquisa('')}>
-              <Ionicons
-                name="close-circle"
-                size={20}
-                color={COLORS.textSecondary}
-              />
+              <Ionicons name="close-circle" size={20} color={COLORS.textSecondary} />
             </TouchableOpacity>
           )}
         </View>
 
-        {/* FILTROS */}
-        <View style={styles.categories}>
-          {['Todos', 'Cachorro', 'Gato'].map((item) => {
-            const selecionado = categoria === item;
-
-            return (
-              <TouchableOpacity
-                key={item}
-                style={[
-                  styles.categoryButton,
-                  selecionado && styles.categorySelected,
-                ]}
-                onPress={() => setCategoria(item)}
-              >
-                <Text
-                  style={[
-                    styles.categoryText,
-                    selecionado && styles.categoryTextSelected,
-                  ]}
-                >
-                  {item === 'Cachorro'
-                    ? 'Cães'
-                    : item === 'Gato'
-                    ? 'Gatos'
-                    : 'Todos'}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+        <View style={styles.categorias}>
+          {[
+            { texto: 'Todos', valor: 'Todos' },
+            { texto: 'Cães', valor: 'dog' },
+            { texto: 'Gatos', valor: 'cat' }
+          ].map(item => (
+            <TouchableOpacity
+              key={item.valor}
+              style={[
+                styles.categoria,
+                categoria === item.valor && styles.ativo
+              ]}
+              onPress={() => setCategoria(item.valor)}
+            >
+              <Text style={{
+                color: categoria === item.valor ? COLORS.white : COLORS.primary,
+                fontWeight: 'bold'
+              }}>
+                {item.texto}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
-        {/* QUANTIDADE */}
-        <View style={styles.resultHeader}>
-          <Text style={styles.sectionTitle}>
-            Animais disponíveis
-          </Text>
-
-          <Text style={styles.resultCount}>
-            {animaisFiltrados.length} encontrados
-          </Text>
+        <View style={styles.linha}>
+          <Text style={styles.secao}>Animais disponíveis</Text>
+          <Text style={styles.subtitulo}>{filtrados.length} encontrados</Text>
         </View>
 
-        {/* LISTA DE ANIMAIS */}
-        {animaisFiltrados.map((animal) => (
+        {carregando && animais.length === 0 && (
+          <ActivityIndicator size="large" color={COLORS.primary} />
+        )}
+
+        {erro !== '' && (
+          <View style={styles.aviso}>
+            <Text style={styles.subtitulo}>{erro}</Text>
+            <TouchableOpacity onPress={carregar}>
+              <Text style={styles.link}>Tentar novamente</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {!erro && filtrados.map(animal => (
           <TouchableOpacity
             key={animal.id}
             style={styles.card}
-            activeOpacity={0.85}
-            onPress={() => abrirDetalhes(animal)}
+            onPress={() => router.push({
+              pathname: '/detalhes',
+              params: { id: animal.id }
+            })}
           >
-            <Image
-              source={{ uri: animal.foto }}
-              style={styles.animalImage}
-              resizeMode="cover"
-            />
-
-            <View style={styles.information}>
-              <View style={styles.nameRow}>
-                <Text style={styles.animalName}>
-                  {animal.nome}
-                </Text>
-
-                <Ionicons
-                  name={
-                    animal.sexo === 'Macho'
-                      ? 'male-outline'
-                      : 'female-outline'
-                  }
-                  size={19}
-                  color={COLORS.primary}
-                />
+            {animal.photoUrl ? (
+              <Image source={{ uri: animal.photoUrl }} style={styles.foto} />
+            ) : (
+              <View style={[styles.foto, styles.semFoto]}>
+                <Ionicons name="paw" size={38} color={COLORS.primary} />
               </View>
+            )}
 
-              <Text style={styles.description}>
-                {animal.tipo} • {animal.idade}
+            <View style={styles.informacoes}>
+              <Text style={styles.nome}>{animal.name}</Text>
+              <Text style={styles.subtitulo}>
+                {animal.species === 'dog' ? 'Cachorro' :
+                 animal.species === 'cat' ? 'Gato' : animal.species}
               </Text>
 
-              <Text style={styles.description}>
-                {animal.sexo}
-              </Text>
-
-              <View style={styles.locationRow}>
+              <View style={styles.local}>
                 <Ionicons
                   name="location-outline"
                   size={14}
                   color={COLORS.textSecondary}
                 />
-
-                <Text
-                  style={styles.location}
-                  numberOfLines={1}
-                >
-                  {animal.cidade}
+                <Text style={styles.subtitulo} numberOfLines={1}>
+                  {animal.city}
                 </Text>
               </View>
 
-              <View style={styles.detailsRow}>
-                <Text style={styles.detailsText}>
-                  Ver detalhes
-                </Text>
-
+              <View style={styles.local}>
+                <Text style={styles.link}>Ver detalhes</Text>
                 <Ionicons
                   name="arrow-forward"
                   size={17}
@@ -293,33 +180,15 @@ export default function AnimaisScreen() {
           </TouchableOpacity>
         ))}
 
-        {/* NENHUM RESULTADO */}
-        {animaisFiltrados.length === 0 && (
-          <View style={styles.emptyContainer}>
-            <Ionicons
-              name="search-outline"
-              size={40}
-              color={COLORS.textSecondary}
-            />
-
-            <Text style={styles.emptyTitle}>
-              Nenhum animal encontrado
-            </Text>
-
-            <Text style={styles.emptyDescription}>
-              Tente outro nome, cidade ou categoria.
-            </Text>
-
-            <TouchableOpacity
-              style={styles.clearButton}
-              onPress={() => {
-                setPesquisa('');
-                setCategoria('Todos');
-              }}
-            >
-              <Text style={styles.clearButtonText}>
-                Limpar filtros
-              </Text>
+        {!carregando && !erro && filtrados.length === 0 && (
+          <View style={styles.aviso}>
+            <Ionicons name="search-outline" size={38} color={COLORS.textSecondary} />
+            <Text style={styles.secao}>Nenhum animal encontrado</Text>
+            <TouchableOpacity onPress={() => {
+              setPesquisa('');
+              setCategoria('Todos');
+            }}>
+              <Text style={styles.link}>Limpar filtros</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -330,233 +199,120 @@ export default function AnimaisScreen() {
 
 const styles = StyleSheet.create({
   header: {
-    paddingTop: 55,
-    paddingHorizontal: SPACING.lg,
-    paddingBottom: 18,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.background,
+    paddingHorizontal: SPACING.lg,
+    paddingTop: 55,
+    paddingBottom: 18
   },
-
-  backButton: {
-    width: 42,
-    height: 42,
-    borderRadius: RADIUS.medium,
-    backgroundColor: COLORS.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-
-  headerText: {
-    flex: 1,
-  },
-
-  headerLabel: {
-    fontSize: 10,
+  marca: {
+    color: COLORS.primary,
     fontWeight: 'bold',
     letterSpacing: 1.5,
-    color: COLORS.primary,
-    marginBottom: 4,
+    fontSize: 10
   },
-
-  title: {
+  titulo: {
     fontSize: 21,
     fontWeight: 'bold',
-    color: COLORS.text,
+    color: COLORS.text
   },
-
-  profileButton: {
-    width: 42,
-    height: 42,
-    borderRadius: RADIUS.medium,
-    backgroundColor: COLORS.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 8,
-  },
-
-  content: {
+  conteudo: {
     paddingHorizontal: SPACING.lg,
-    paddingTop: 10,
-    paddingBottom: 45,
+    paddingBottom: 45
   },
-
-  subtitle: {
-    fontSize: FONTS.regular,
+  subtitulo: {
     color: COLORS.textSecondary,
-    lineHeight: 21,
-    marginBottom: 23,
+    fontSize: 13,
+    lineHeight: 21
   },
-
-  searchBox: {
+  busca: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.medium,
     borderWidth: 1,
     borderColor: COLORS.border,
-    height: 54,
     paddingHorizontal: 15,
-    marginBottom: 17,
+    height: 54,
+    marginVertical: 22
   },
-
-  searchInput: {
+  input: {
     flex: 1,
-    fontSize: FONTS.regular,
-    color: COLORS.text,
     marginLeft: 10,
+    color: COLORS.text
   },
-
-  categories: {
+  categorias: {
     flexDirection: 'row',
     gap: 10,
-    marginBottom: 28,
+    marginBottom: 28
   },
-
-  categoryButton: {
+  categoria: {
     flex: 1,
-    paddingVertical: 13,
     alignItems: 'center',
-    backgroundColor: COLORS.white,
+    paddingVertical: 13,
     borderRadius: RADIUS.medium,
     borderWidth: 1,
     borderColor: COLORS.border,
+    backgroundColor: COLORS.white
   },
-
-  categorySelected: {
+  ativo: {
     backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
+    borderColor: COLORS.primary
   },
-
-  categoryText: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    color: COLORS.primary,
-  },
-
-  categoryTextSelected: {
-    color: COLORS.white,
-  },
-
-  resultHeader: {
+  linha: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 17,
+    alignItems: 'center',
+    marginBottom: 17
   },
-
-  sectionTitle: {
-    fontSize: FONTS.large,
+  secao: {
+    fontSize: 18,
     fontWeight: 'bold',
-    color: COLORS.text,
+    color: COLORS.text
   },
-
-  resultCount: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-  },
-
   card: {
     flexDirection: 'row',
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.large,
     padding: 10,
     marginBottom: 15,
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.large,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: COLORS.border
   },
-
-  animalImage: {
+  foto: {
     width: 115,
     height: 150,
-    borderRadius: RADIUS.medium,
-    backgroundColor: COLORS.primaryLight,
-    marginRight: 13,
+    borderRadius: RADIUS.medium
   },
-
-  information: {
+  semFoto: {
+    backgroundColor: COLORS.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  informacoes: {
     flex: 1,
     justifyContent: 'center',
+    marginLeft: 13
   },
-
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 5,
-  },
-
-  animalName: {
+  nome: {
     fontSize: 21,
     fontWeight: 'bold',
-    color: COLORS.text,
+    color: COLORS.text
   },
-
-  description: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    marginBottom: 4,
-  },
-
-  locationRow: {
+  local: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 5,
-    gap: 3,
+    gap: 6,
+    marginTop: 12
   },
-
-  location: {
-    flex: 1,
-    fontSize: 11,
-    color: COLORS.textSecondary,
-  },
-
-  detailsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    marginTop: 13,
-  },
-
-  detailsText: {
-    fontSize: 12,
-    fontWeight: 'bold',
+  link: {
     color: COLORS.primary,
+    fontWeight: 'bold',
+    fontSize: 12
   },
-
-  emptyContainer: {
+  aviso: {
     alignItems: 'center',
-    paddingVertical: 35,
-  },
-
-  emptyTitle: {
-    fontSize: 17,
-    fontWeight: 'bold',
-    color: COLORS.text,
-    marginTop: 12,
-  },
-
-  emptyDescription: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
-    marginTop: 7,
-    textAlign: 'center',
-  },
-
-  clearButton: {
-    marginTop: 20,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.medium,
-  },
-
-  clearButtonText: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    color: COLORS.white,
-  },
+    gap: 12,
+    paddingVertical: 35
+  }
 });

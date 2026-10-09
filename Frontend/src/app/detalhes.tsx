@@ -1,517 +1,258 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Alert,
-  Image,
-  StatusBar,
+  View, Text, Image, ScrollView, TouchableOpacity,
+  StyleSheet, ActivityIndicator, Alert
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import {
-  COLORS,
-  FONTS,
-  SPACING,
-  RADIUS,
-  globalStyles,
-} from '../styles/theme';
+import { COLORS, RADIUS, SPACING, globalStyles } from '../styles/theme';
+import { buscarAnimal, Pet } from '../services/api';
 
 export default function DetalhesScreen() {
-  const params = useLocalSearchParams();
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const [animal, setAnimal] = useState<Pet | null>(null);
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState('');
 
-  const nome = String(params.nome || 'Thor');
-  const tipo = String(params.tipo || 'Cachorro');
-  const idade = String(params.idade || '2 anos');
-  const sexo = String(params.sexo || 'Macho');
-  const cidade = String(params.cidade || 'Erechim - RS');
-  const emoji = String(params.emoji || '🐶');
+  useEffect(() => {
+    let ativo = true;
 
-  const fotos: Record<string, string> = {
-    Thor: 'https://images.unsplash.com/photo-1552053831-71594a27632d?w=900',
-    Luna: 'https://images.unsplash.com/photo-1573865526739-10659fec78a5?w=900',
-    Bob: 'https://images.unsplash.com/photo-1587300003388-59208cc962cb?w=900',
-    Mel: 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=900',
-  };
+    async function carregar() {
+      setCarregando(true);
+      setErro('');
+      setAnimal(null);
 
-  const foto = String(params.foto || fotos[nome] || '');
+      try {
+        if (!id) throw new Error('Animal não identificado.');
+        const dados = await buscarAnimal(id);
+        if (ativo) setAnimal(dados);
+      } catch (e) {
+        if (ativo) {
+          setErro(e instanceof Error ? e.message : 'Erro ao buscar animal.');
+        }
+      } finally {
+        if (ativo) setCarregando(false);
+      }
+    }
 
-  const porte =
-    tipo === 'Gato'
-      ? 'Pequeno'
-      : nome === 'Bob'
-      ? 'Grande'
-      : 'Médio';
+    carregar();
+    return () => { ativo = false; };
+  }, [id]);
 
-  const descricao =
-    nome === 'Thor'
-      ? 'Thor é um cachorro carinhoso, brincalhão e cheio de energia. Ele adora passeios e procura uma família que possa oferecer atenção, cuidado e muito carinho.'
-      : nome === 'Luna'
-      ? 'Luna é uma gatinha tranquila e muito companheira. Gosta de ambientes calmos, de receber carinho e de descansar em lugares aconchegantes.'
-      : nome === 'Bob'
-      ? 'Bob é um cachorro amigável, esperto e cheio de personalidade. Adora passeios e momentos ao ar livre. Está esperando uma família para compartilhar novas aventuras.'
-      : nome === 'Mel'
-      ? 'Mel é uma gatinha jovem, curiosa e brincalhona. Muito dócil, gosta de explorar os ambientes e está pronta para conhecer seu novo lar.'
-      : 'Este animal está esperando uma família que possa oferecer carinho, atenção e os cuidados necessários para uma vida feliz.';
-
-  function queroAdotar() {
-    Alert.alert(
-      'Interesse na adoção',
-      `Você demonstrou interesse em adotar ${nome}. Em breve, esta funcionalidade permitirá entrar em contato com o responsável pelo animal.`,
-      [{ text: 'Entendi', style: 'default' }]
-    );
-  }
+  const tipo = animal?.species === 'dog' ? 'Cachorro' :
+               animal?.species === 'cat' ? 'Gato' : animal?.species;
 
   return (
     <View style={globalStyles.container}>
-      <StatusBar
-        barStyle="dark-content"
-        backgroundColor={COLORS.background}
-      />
-
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.content}
-      >
-        {/* CABEÇALHO */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <Ionicons
-              name="arrow-back"
-              size={23}
-              color={COLORS.primary}
-            />
+      <ScrollView contentContainerStyle={styles.conteudo}>
+        <View style={styles.cabecalho}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={25} color={COLORS.primary} />
           </TouchableOpacity>
-
-          <Text style={styles.headerTitle}>
-            Detalhes do animal
-          </Text>
-
-          <View style={styles.headerSpacer} />
+          <Text style={styles.titulo}>Detalhes do animal</Text>
+          <View style={{ width: 25 }} />
         </View>
 
-        {/* FOTO */}
-        <View style={styles.imageContainer}>
-          {foto ? (
-            <Image
-              source={{ uri: foto }}
-              style={styles.animalImage}
-              resizeMode="cover"
-            />
-          ) : (
-            <Text style={styles.emoji}>{emoji}</Text>
-          )}
-
-          <View style={styles.imageBadge}>
-            <Ionicons
-              name="paw"
-              size={13}
-              color={COLORS.primary}
-            />
-            <Text style={styles.imageBadgeText}>
-              Disponível para adoção
-            </Text>
+        {carregando ? (
+          <ActivityIndicator size="large" color={COLORS.primary} />
+        ) : erro ? (
+          <View style={styles.centro}>
+            <Text style={styles.texto}>{erro}</Text>
+            <TouchableOpacity onPress={() => router.back()}>
+              <Text style={styles.link}>Voltar à lista</Text>
+            </TouchableOpacity>
           </View>
-        </View>
+        ) : animal && (
+          <>
+            <View style={styles.fotoArea}>
+              {animal.photoUrl ? (
+                <Image
+                  source={{ uri: animal.photoUrl }}
+                  style={styles.foto}
+                  resizeMode="cover"
+                />
+              ) : (
+                <Ionicons name="paw" size={85} color={COLORS.primary} />
+              )}
+            </View>
 
-        {/* IDENTIFICAÇÃO */}
-        <View style={styles.nameSection}>
-          <View style={styles.nameRow}>
-            <Text style={styles.name}>{nome}</Text>
+            <View style={styles.linha}>
+              <Text style={styles.nome}>{animal.name}</Text>
+              <View style={styles.etiqueta}>
+                <Text style={styles.link}>{tipo}</Text>
+              </View>
+            </View>
 
-            <View style={styles.typeBadge}>
-              <Text style={styles.typeBadgeText}>
-                {tipo}
+            <Text style={styles.texto}>
+              Conheça um pouco mais sobre {animal.name} e descubra
+              se vocês podem formar uma nova amizade.
+            </Text>
+
+            <View style={styles.local}>
+              <Ionicons name="location-outline" size={25} color={COLORS.primary} />
+              <View>
+                <Text style={styles.texto}>Localização</Text>
+                <Text style={styles.localTexto}>{animal.city}</Text>
+              </View>
+            </View>
+
+            <Text style={styles.secao}>Sobre {animal.name}</Text>
+            <Text style={styles.descricao}>
+              {animal.description || 'Descrição ainda não cadastrada.'}
+            </Text>
+
+            <View style={styles.aviso}>
+              <View style={styles.avisoTitulo}>
+                <Ionicons name="heart-outline" size={21} color={COLORS.primary} />
+                <Text style={styles.secao}>Adoção responsável</Text>
+              </View>
+              <Text style={styles.texto}>
+                Adotar é assumir um compromisso de cuidado,
+                respeito e carinho durante toda a vida do animal.
+                Considere sua rotina, seu espaço e as necessidades
+                do novo companheiro.
               </Text>
             </View>
-          </View>
 
-          <Text style={styles.introduction}>
-            Conheça um pouco mais sobre {nome} e descubra
-            se vocês podem formar uma nova amizade.
-          </Text>
-        </View>
+            <TouchableOpacity
+              style={styles.botao}
+              onPress={() => Alert.alert(
+                'Solicitação de adoção',
+                'Essa funcionalidade estará disponível quando o backend de solicitações estiver pronto.'
+              )}
+            >
+              <Ionicons name="heart" size={21} color={COLORS.white} />
+              <Text style={styles.botaoTexto}>Tenho interesse em adotar</Text>
+              <Ionicons name="arrow-forward" size={19} color={COLORS.white} />
+            </TouchableOpacity>
 
-        {/* INFORMAÇÕES */}
-        <View style={styles.infoContainer}>
-          <View style={styles.infoCard}>
-            <View style={styles.infoIconBox}>
-              <Ionicons
-                name="calendar-outline"
-                size={22}
-                color={COLORS.primary}
-              />
-            </View>
-
-            <Text style={styles.infoTitle}>Idade</Text>
-            <Text style={styles.infoValue}>{idade}</Text>
-          </View>
-
-          <View style={styles.infoCard}>
-            <View style={styles.infoIconBox}>
-              <Ionicons
-                name={
-                  sexo === 'Fêmea'
-                    ? 'female-outline'
-                    : 'male-outline'
-                }
-                size={22}
-                color={COLORS.primary}
-              />
-            </View>
-
-            <Text style={styles.infoTitle}>Sexo</Text>
-            <Text style={styles.infoValue}>{sexo}</Text>
-          </View>
-
-          <View style={styles.infoCard}>
-            <View style={styles.infoIconBox}>
-              <Ionicons
-                name="resize-outline"
-                size={22}
-                color={COLORS.primary}
-              />
-            </View>
-
-            <Text style={styles.infoTitle}>Porte</Text>
-            <Text style={styles.infoValue}>{porte}</Text>
-          </View>
-        </View>
-
-        {/* LOCALIZAÇÃO */}
-        <View style={styles.locationBox}>
-          <View style={styles.locationIcon}>
-            <Ionicons
-              name="location-outline"
-              size={22}
-              color={COLORS.primary}
-            />
-          </View>
-
-          <View>
-            <Text style={styles.locationLabel}>
-              Localização
+            <Text style={styles.rodape}>
+              Um novo começo pode transformar duas vidas.
             </Text>
-            <Text style={styles.locationText}>
-              {cidade}
-            </Text>
-          </View>
-        </View>
-
-        {/* SOBRE O ANIMAL */}
-        <Text style={styles.sectionTitle}>
-          Sobre {nome}
-        </Text>
-
-        <Text style={styles.description}>
-          {descricao}
-        </Text>
-
-        {/* ADOÇÃO RESPONSÁVEL */}
-        <View style={styles.notice}>
-          <View style={styles.noticeHeader}>
-            <Ionicons
-              name="heart-outline"
-              size={21}
-              color={COLORS.primary}
-            />
-
-            <Text style={styles.noticeTitle}>
-              Adoção responsável
-            </Text>
-          </View>
-
-          <Text style={styles.noticeText}>
-            Adotar é assumir um compromisso de cuidado,
-            respeito e carinho durante toda a vida do animal.
-            Antes de adotar, considere sua rotina, seu espaço
-            e as necessidades do novo companheiro.
-          </Text>
-        </View>
-
-        {/* BOTÃO DE ADOÇÃO */}
-        <TouchableOpacity
-          style={styles.adoptButton}
-          activeOpacity={0.85}
-          onPress={queroAdotar}
-        >
-          <Ionicons
-            name="heart"
-            size={21}
-            color={COLORS.white}
-          />
-
-          <Text style={styles.adoptButtonText}>
-            Tenho interesse em adotar
-          </Text>
-
-          <Ionicons
-            name="arrow-forward"
-            size={19}
-            color={COLORS.white}
-          />
-        </TouchableOpacity>
-
-        <Text style={styles.footerText}>
-          Um novo começo pode transformar duas vidas.
-        </Text>
+          </>
+        )}
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  content: {
+  conteudo: {
     paddingHorizontal: SPACING.lg,
     paddingTop: 55,
-    paddingBottom: 50,
+    paddingBottom: 50
   },
-
-  header: {
+  cabecalho: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 22,
+    marginBottom: 22
   },
-
-  backButton: {
-    width: 43,
-    height: 43,
-    borderRadius: RADIUS.medium,
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  headerTitle: {
+  titulo: {
     fontSize: 17,
     fontWeight: 'bold',
-    color: COLORS.text,
+    color: COLORS.text
   },
-
-  headerSpacer: {
-    width: 43,
+  centro: {
+    alignItems: 'center',
+    gap: 15,
+    marginTop: 40
   },
-
-  imageContainer: {
+  fotoArea: {
     height: 285,
     borderRadius: RADIUS.extraLarge,
-    overflow: 'hidden',
     backgroundColor: COLORS.primaryLight,
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 23,
+    overflow: 'hidden',
+    marginBottom: 23
   },
-
-  animalImage: {
+  foto: {
     width: '100%',
-    height: '100%',
+    height: '100%'
   },
-
-  emoji: {
-    fontSize: 100,
-  },
-
-  imageBadge: {
-    position: 'absolute',
-    bottom: 15,
-    left: 15,
-    backgroundColor: COLORS.white,
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-
-  imageBadgeText: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: COLORS.primary,
-  },
-
-  nameSection: {
-    marginBottom: 25,
-  },
-
-  nameRow: {
+  linha: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 12
   },
-
-  name: {
+  nome: {
+    flex: 1,
     fontSize: 32,
     fontWeight: 'bold',
-    color: COLORS.text,
-    flex: 1,
+    color: COLORS.text
   },
-
-  typeBadge: {
+  etiqueta: {
     backgroundColor: COLORS.primaryLight,
-    paddingHorizontal: 13,
-    paddingVertical: 8,
     borderRadius: 20,
+    paddingHorizontal: 13,
+    paddingVertical: 8
   },
-
-  typeBadgeText: {
+  link: {
     color: COLORS.primary,
-    fontSize: 12,
-    fontWeight: 'bold',
+    fontWeight: 'bold'
   },
-
-  introduction: {
-    fontSize: FONTS.regular,
+  texto: {
     color: COLORS.textSecondary,
-    lineHeight: 21,
+    lineHeight: 22
   },
-
-  infoContainer: {
+  local: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 10,
-    marginBottom: 20,
-  },
-
-  infoCard: {
-    flex: 1,
+    alignItems: 'center',
+    gap: 15,
+    padding: 17,
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.large,
     borderWidth: 1,
     borderColor: COLORS.border,
-    paddingVertical: 15,
-    paddingHorizontal: 5,
-    alignItems: 'center',
+    marginVertical: 25
   },
-
-  infoIconBox: {
-    width: 43,
-    height: 43,
-    borderRadius: RADIUS.medium,
-    backgroundColor: COLORS.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
-  },
-
-  infoTitle: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    marginBottom: 5,
-  },
-
-  infoValue: {
-    fontSize: 13,
+  localTexto: {
     fontWeight: 'bold',
     color: COLORS.text,
-    textAlign: 'center',
+    fontSize: 15
   },
-
-  locationBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.large,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    padding: 15,
-    marginBottom: 30,
-  },
-
-  locationIcon: {
-    width: 45,
-    height: 45,
-    borderRadius: RADIUS.medium,
-    backgroundColor: COLORS.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 13,
-  },
-
-  locationLabel: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    marginBottom: 4,
-  },
-
-  locationText: {
-    fontSize: 15,
+  secao: {
+    fontSize: 18,
     fontWeight: 'bold',
     color: COLORS.text,
+    marginBottom: 10
   },
-
-  sectionTitle: {
-    fontSize: FONTS.large,
-    fontWeight: 'bold',
-    color: COLORS.text,
-    marginBottom: 12,
-  },
-
-  description: {
-    fontSize: 15,
+  descricao: {
     color: COLORS.textSecondary,
     lineHeight: 24,
-    marginBottom: 28,
+    marginBottom: 28
   },
-
-  notice: {
+  aviso: {
     backgroundColor: COLORS.primaryLight,
     borderRadius: RADIUS.large,
     padding: 18,
-    marginBottom: 25,
+    marginBottom: 25
   },
-
-  noticeHeader: {
+  avisoTitulo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 9,
-    marginBottom: 10,
+    gap: 9
   },
-
-  noticeTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: COLORS.primaryDark,
-  },
-
-  noticeText: {
-    fontSize: 13,
-    color: COLORS.primary,
-    lineHeight: 21,
-  },
-
-  adoptButton: {
+  botao: {
     backgroundColor: COLORS.primary,
     borderRadius: RADIUS.medium,
     paddingVertical: 18,
-    paddingHorizontal: 17,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
+    gap: 10
   },
-
-  adoptButtonText: {
+  botaoTexto: {
     color: COLORS.white,
-    fontSize: 14,
     fontWeight: 'bold',
-    flexShrink: 1,
+    flexShrink: 1
   },
-
-  footerText: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
+  rodape: {
     textAlign: 'center',
-    marginTop: 20,
-  },
+    color: COLORS.textSecondary,
+    marginTop: 20
+  }
 });
