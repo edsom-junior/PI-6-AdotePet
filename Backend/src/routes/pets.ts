@@ -54,4 +54,34 @@ router.post('/', requireAuth, async (req, res) => {
     }
 });
 
+router.put('/:id', requireAuth, async (req,res) => {
+
+  try{
+    const id = req.params.id as string;
+    const {name, species, city, description } = req.body;
+
+    if(!req.user) {
+      return res.status(401).json({error: 'nao autenticado'});
+    }
+
+    const pet = await prisma.pet.findUnique({where: { id }});
+    if(!pet) {
+      return res.status(404).json({error: 'voce so pode editar seus proprios pets'});
+    }
+    const updatedPet = await prisma.pet.update({
+      where: { id },
+      data: { name, species, city, description},
+
+    });
+
+    res.json(updatedPet);
+  }catch (error) {
+    console.error(error);
+    res.status(500).json({error: 'erro ao atualizar pet'});
+  }
+});
+
+
+  
+
 export default router;  
