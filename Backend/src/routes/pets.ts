@@ -82,6 +82,32 @@ router.put('/:id', requireAuth, async (req,res) => {
 });
 
 
+  router.delete('/:id', requireAuth, async (req, res) => {
+  try {
+    const id = req.params.id as string;
+
+    if(!req.user) {
+      return res.status(401).json({error: 'nao autenticado'});
+    }
+
+    const pet = await prisma.pet.findUnique({ where: { id } });
+    if (!pet) {
+      return res.status(404).json({ error: 'pet nao encontrado' });
+    }
+
+    if (pet.shelterId !== req.user.id) {
+      return res.status(403).json({ error: 'voce so pode deletar seus proprios pets' });
+    }
+
+    await prisma.pet.delete({ where: { id } });
+
+    res.json({ message: 'pet deletado com sucesso' });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'erro ao deletar pet' });
+  }
+});
   
 
 export default router;  
