@@ -6,11 +6,22 @@ const router = Router();
 
 router.get('/', async (req, res) => {
   try {
-    const pets = await prisma.pet.findMany();
+    const { species, city } = req.query;
+    const where: { species?: string; city?: string } = {};  
+
+    if (typeof species === 'string' && species) {
+      where.species = species;
+    }
+    if (typeof city === 'string' && city) {
+      where.city = city;
+    }
+    const pets = await prisma.pet.findMany({ where });
+    
     res.json(pets);
+
   } catch (error) {
-    console.error( error);
-    res.status(500).json({ error: ' erro ao buscar pets' });
+    console.error(error);
+    res.status(500).json({ error: 'erro ao buscar pets' });
   }
 });
 
